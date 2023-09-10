@@ -1,8 +1,8 @@
 const log = require("./utils/log");
 const clone = require("./utils/clone");
 const registry = require("./registry");
+const context = require('./context');
 
-const context = {};
 const NOOP_SEND = function () { }
 
 class Node {
@@ -23,8 +23,9 @@ class Node {
         this.updateWires(config.wires);
         this.listeners = {};
         this.displayName = this.alias || this.name || this.id;
-        // TODO : context
-        this.context = {};
+
+        this._context = context.getContext(this.id, this.z);
+        this.context = () => this._context;
     }
 
     /**
@@ -108,6 +109,24 @@ class Node {
         }
         this.listeners[eventName].push(cb);
     }
+
+    /**
+     * Register an event listener for one time
+     * @param {String} eventName
+     * @param {Function} cb
+     * @memberof Node
+     */
+    once(eventName, cb) {
+        if (!this.listeners[eventName]) {
+            this.listeners[eventName] = [];
+        }
+        const customListen = (...params) => {
+            cb(...params);
+            this.listeners[eventName] = this.listeners[eventName].filter((e) => e !== customListen)
+        }
+        this.listeners[eventName].push(customListen);
+    }
+
     /**
      * Trigger events listener
      * @param {*} eventName

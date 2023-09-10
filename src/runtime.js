@@ -2,6 +2,7 @@ const clone = require('./utils/clone');
 const Node = require('./node');
 const log = require('./utils/log');
 const registry = require('./registry');
+const context = require('./context');
 
 const api = {
     _: () => {
@@ -37,6 +38,7 @@ const output = {
      */
     async clear() {
         await output.stop();
+        context.clearContext();
         registry.cleanTypes();
     },
     async load(flows, credentials) {

@@ -1,9 +1,12 @@
 {
     "name": "bun-red-test-helper",
-    "module": "index.js",
-    "type": "module",
+    "scripts": {
+        "test": "mocha ./examples/**/*_spec.js"
+    },
     "devDependencies": {
-        "bun-types": "latest"
+        "bun-types": "latest",
+        "should": "^13.2.3",
+        "mocha": "9.2.2"
     },
     "peerDependencies": {
         "typescript": "^5.0.0"

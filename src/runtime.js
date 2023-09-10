@@ -3,6 +3,7 @@ const Node = require('./node');
 const log = require('./utils/log');
 const registry = require('./registry');
 const context = require('./context');
+const crypto = require('crypto');
 
 const api = {
     _: () => {
@@ -22,6 +23,9 @@ const api = {
     util: {
         log: log,
         clone: clone,
+        generateId: () => {
+            return crypto.randomUUID();
+        }
     },
 }
 

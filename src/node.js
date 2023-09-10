@@ -96,6 +96,7 @@ class Node {
     trace(str, ...options) {
         log.trace(`[NODE-${this.displayName}] ${str}`, ...options);
     }
+    metric() { }
 
     /**
      * Register an event listener

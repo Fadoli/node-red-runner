@@ -47,14 +47,14 @@ describe('function node', function () {
         { id: "n2", type: "helper" }];
         await helper.load(functionNode, flow);
         console.log("LOADED !!!");
-        var n1 = helper.getNode("n1");
-        var n2 = helper.getNode("n2");
-        n2.on("input", function (msg) {
-            expect(msg.topic).toBe('bar');
-            expect(msg.payload).toBe('foo');
-            done();
-        });
+        const n1 = helper.getNode("n1");
+        const n2 = helper.getNode("n2");
+        let promiseMsg = helper.awaitNodeInput(n2);
         n1.receive({ payload: "foo", topic: "bar" });
+        const msg = await promiseMsg;
+        console.log(msg);
+        expect(msg.topic).toBe('bar');
+        expect(msg.payload).toBe('foo');
     });
 
     test('should send returned message', function (done) {

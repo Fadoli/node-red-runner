@@ -73,5 +73,22 @@ module.exports = {
         await runtime.load(flows, creds);
     },
     getNode: registry.getNode,
+    awaitNodeInput: async (node, delay) => {
+        if (typeof node !== 'object') {
+            node = getNode(node);
+        }
+        if (!node) {
+            throw new Error('node does node exist !');
+        }
+        return new Promise((res, rej) => {
+            let rejectTimeout = setTimeout(() => {
+                rej(new Error('node did not recieve any message in the expected delay !'));
+            }, delay)
+            node.once('input', (msg) => {
+                clearTimeout(rejectTimeout);
+                res(msg);
+            })
+        })
+    },
     init: () => { }
 }

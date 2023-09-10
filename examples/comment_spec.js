@@ -28,4 +28,12 @@ describe('comment Node', async function () {
         });
     });
 
+    test('should be loaded async', async function () {
+        var flow = [{ id: "n1", type: "comment", name: "comment" }];
+        await helper.load(commentNode, flow);
+        var n1 = helper.getNode("n1");
+        let promise = helper.awaitNodeInput(n1, 500);
+        n1.receive({ payload: 1 });
+        expect((await promise).payload).toBe(1);
+    });
 });

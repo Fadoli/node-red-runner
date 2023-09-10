@@ -5,6 +5,10 @@ const context = require('./context');
 
 const NOOP_SEND = function () { }
 
+function wrapOnInput(node, cb) {
+    return (msg) => cb(msg, node.send, () => { });
+}
+
 class Node {
 
     /**
@@ -49,11 +53,17 @@ class Node {
             if (this.wires[0].length === 1) {
                 const target = this.wires[0][0];
                 this.send = (msg) => {
+                    if (Array.isArray(msg)) {
+                        msg = msg[0];
+                    }
                     registry.getNode(target).trigger('input', msg);
                 }
             } else {
                 const targets = this.wires[0];
                 this.send = (msg) => {
+                    if (Array.isArray(msg)) {
+                        msg = msg[0];
+                    }
                     targets.forEach((target) => { registry.getNode(target).trigger('input', clone(msg)); })
                 }
             }
@@ -107,6 +117,10 @@ class Node {
     on(eventName, cb) {
         if (!this.listeners[eventName]) {
             this.listeners[eventName] = [];
+        }
+        // Hack for injecting send and done
+        if (eventName === 'input') {
+            cb = wrapOnInput(this, cb);
         }
         this.listeners[eventName].push(cb);
     }

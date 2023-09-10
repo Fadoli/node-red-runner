@@ -1,21 +1,17 @@
 const clone = require('./utils/clone');
 const Node = require('./node');
-const log = require('./utils/log')
-
-let knownTypes = {};
-let flow = {};
+const log = require('./utils/log');
+const registry = require('./registry');
 
 const api = {
     _: () => {
         return "";
     },
     nodes: {
-        registerType: (name, constructor) => {
-            knownTypes[name] = constructor;
-        },
+        registerType: registry.registerType,
         createNode: (ctx, opts) => {
-            flow[opts.id] = ctx;
-        }
+            // doesn't do anything
+        },
     },
     library: {
         register: () => {
@@ -28,7 +24,7 @@ const api = {
     },
 }
 
-module.exports = {
+const output = {
     /**
      * Import a module !
      * @param {function} module
@@ -39,18 +35,36 @@ module.exports = {
     /**
      * Clear known modules !
      */
-    clear() {
-        knownTypes = {};
+    async clear() {
+        await output.stop();
+        registry.cleanTypes();
     },
-    getNode(id) {
-        return flow[id];
+    async load(flows, credentials) {
+        return Promise.all(
+            flows.map(async (config) => {
+                const node = new Node(config);
+                if (!registry.knownTypes[config.type]) {
+                    throw new Error("Unknown node type : " + config.type);
+                }
+                await registry.knownTypes[config.type].call(node, config)
+                registry.flow[config.id] = node;
+            })
+        );
     },
-    load(flows, credentials) {
-        console.log(knownTypes);
-        flows.forEach(config => {
-            const node = new Node(config);
-            knownTypes[config.type].call(node, config)
-            flow[config.id] = node;
-        });
-    }
+    /**
+     * Stops the flow and remove the nodes
+     * @param {boolean} [isRemoval=true]
+     * @return {Promise<>} 
+     */
+    async stop(isRemoval = true) {
+        const promises = [];
+        for (const nodeId in registry.flow) {
+            const node = registry.flow[nodeId];
+            promises.push(Promise.all(node.trigger("close", isRemoval)));
+        }
+        registry.cleanFlow();
+        return Promise.all(promises);
+    },
 }
+
+module.exports = output;

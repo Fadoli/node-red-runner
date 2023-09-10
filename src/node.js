@@ -1,6 +1,6 @@
 const log = require("./utils/log");
 const clone = require("./utils/clone");
-const runtime = require("./runtime");
+const registry = require("./registry");
 
 const context = {};
 const NOOP_SEND = function () { }
@@ -48,12 +48,12 @@ class Node {
             if (this.wires[0].length === 1) {
                 const target = this.wires[0][0];
                 this.send = (msg) => {
-                    runtime.getNode(target).trigger('input', msg);
+                    registry.getNode(target).trigger('input', msg);
                 }
             } else {
                 const targets = this.wires[0];
                 this.send = (msg) => {
-                    targets.forEach((target) => { runtime.getNode(target).trigger('input', clone(msg)); })
+                    targets.forEach((target) => { registry.getNode(target).trigger('input', clone(msg)); })
                 }
             }
         } else {
@@ -69,7 +69,7 @@ class Node {
                     }
                     const targets = this.wires[id];
                     this.send = (msg) => {
-                        targets.forEach((target) => { runtime.getNode(target).trigger('input', clone(msg)); })
+                        targets.forEach((target) => { registry.getNode(target).trigger('input', clone(msg)); })
                     }
                 }
             }
@@ -112,23 +112,27 @@ class Node {
      * Trigger events listener
      * @param {*} eventName
      * @param {*} params
+     * @return {Array<Promise>} 
      * @memberof Node
      */
     trigger(eventName, ...params) {
         const listeners = this.listeners[eventName];
-        if (!listeners) {
-            return;
-        }
         const output = [];
-        for (const listener of listeners) {
-            output.push(
-                Promise.resolve(listener(...params))
-                    .catch(e => {
-                        this.error(e);
-                    })
-            );
+        if (listeners) {
+            for (const listener of listeners) {
+                output.push(
+                    Promise.resolve(listener(...params))
+                        .catch(e => {
+                            this.error(e);
+                        })
+                );
+            }
         }
         return output;
+    }
+
+    receive(msg) {
+        this.trigger("input", msg);
     }
 
     /**

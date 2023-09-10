@@ -1,4 +1,6 @@
 const runtime = require('./src/runtime');
+const registry = require('./src/registry');
+const helperNode = require('./src/helperNode');
 
 module.exports = {
     startServer: async (cb) => {
@@ -42,16 +44,21 @@ module.exports = {
         try {
             // Do the thing !
             const promises = [];
+            // Add helper node !
+            promises.push(runtime.register(helperNode));
+            // Import other nodes
             nodesToImport.forEach(element => {
                 promises.push(runtime.register(element));
             });
             await Promise.all(promises);
             await runtime.load(flow, creds);
+
             if (cb) {
                 cb();
             }
         } catch (error) {
             if (!cb) {
+                console.error(error);
                 throw error;
             } else {
                 cb(error);
@@ -59,8 +66,12 @@ module.exports = {
         }
     },
     unload: async () => {
-        runtime.clear();
+        await runtime.clear();
     },
-    getNode: runtime.getNode,
+    setFlows: async (flows, creds) => {
+        await runtime.stop();
+        await runtime.load(flows, creds);
+    },
+    getNode: registry.getNode,
     init: () => { }
 }

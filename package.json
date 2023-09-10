@@ -1,0 +1,11 @@
+{
+    "name": "bun-red-test-helper",
+    "module": "index.js",
+    "type": "module",
+    "devDependencies": {
+        "bun-types": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5.0.0"
+    }
+}

@@ -437,17 +437,17 @@ describe('function node', function () {
     });
 
     test('should handle setTimeout()', function (done) {
-        var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "setTimeout(function(){node.send(msg);},1000);" },
+        var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "setTimeout(function(){node.send(msg);},100);" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
             var n1 = helper.getNode("n1");
             var n2 = helper.getNode("n2");
             n2.on("input", function (msg) {
                 var endTime = process.hrtime(startTime);
-                var nanoTime = endTime[0] * 1000000000 + endTime[1];
+                var nanoTime = endTime[0] * 100000000 + endTime[1];
                 expect(msg.topic).toBe('bar');
                 expect(msg.payload).toBe('foo');
-                if (900000000 < nanoTime && nanoTime < 1100000000) {
+                if (90000000 < nanoTime && nanoTime < 110000000) {
                     done();
                 } else {
                     try {
@@ -463,7 +463,7 @@ describe('function node', function () {
     });
 
     test('should handle setInterval()', function (done) {
-        var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "setInterval(function(){node.send(msg);},100);" },
+        var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "setInterval(function(){node.send(msg);},10);" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
             var n1 = helper.getNode("n1");
@@ -482,7 +482,7 @@ describe('function node', function () {
     });
 
     test('should handle clearInterval()', function (done) {
-        var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "var id=setInterval(null,100);setTimeout(function(){clearInterval(id);node.send(msg);},1000);" },
+        var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "var id=setInterval(null,100);setTimeout(function(){clearInterval(id);node.send(msg);},100);" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
             var n1 = helper.getNode("n1");

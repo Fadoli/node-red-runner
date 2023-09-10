@@ -79,9 +79,7 @@ class Node {
                         continue;
                     }
                     const targets = this.wires[id];
-                    this.send = (msg) => {
-                        targets.forEach((target) => { registry.getNode(target).trigger('input', clone(msg)); })
-                    }
+                    targets.forEach((target) => { registry.getNode(target).trigger('input', clone(msg)); })
                 }
             }
         }

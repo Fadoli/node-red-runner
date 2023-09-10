@@ -7,12 +7,13 @@ module.exports = {
     },
 
     sendResults(node, send, _msgid, msgs, cloneFirstMessage) {
-        node.send(msgs);
+        if (msgs) {
+            send(msgs);
+        }
     },
     updateErrorInfo(err) {
         if (err.stack) {
             var stack = err.stack.toString();
-            console.log(stack);
             var m = /^([^:]+):([^:]+):(\d+).*/.exec(stack);
             if (m) {
                 var line = parseInt(m[3]) - 1;

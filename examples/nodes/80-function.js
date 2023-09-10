@@ -232,7 +232,6 @@ module.exports = function (RED) {
             function processMessage(msg, send, done) {
                 var start = process.hrtime();
                 Promise.resolve(functionProcess(msg, send, done)).then(function (results) {
-                    console.log(results);
                     sendResults(node, send, msg._msgid, results, false);
                     if (handleNodeDoneCall) {
                         done();

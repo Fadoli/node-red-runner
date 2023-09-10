@@ -73,7 +73,7 @@ module.exports = {
         await runtime.load(flows, creds);
     },
     getNode: registry.getNode,
-    awaitNodeInput: async (node, delay) => {
+    awaitNodeInput: async (node, delay = 500) => {
         if (typeof node !== 'object') {
             node = getNode(node);
         }

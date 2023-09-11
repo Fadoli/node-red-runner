@@ -164,7 +164,9 @@ class Node {
     }
 
     receive(msg) {
-        this.trigger("input", msg);
+        setImmediate(() => {
+            this.trigger("input", msg);
+        })
     }
 
     /**

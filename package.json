@@ -1,11 +1,17 @@
 {
-    "name": "bun-red-test-helper",
-    "module": "index.js",
-    "type": "module",
-    "devDependencies": {
-        "bun-types": "latest"
-    },
-    "peerDependencies": {
-        "typescript": "^5.0.0"
-    }
+  "name": "bun-red-test-helper",
+  "module": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "bun test --coverage"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
 }

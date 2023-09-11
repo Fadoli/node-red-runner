@@ -5,6 +5,7 @@ const helperNode = require('./src/helperNode');
 module.exports = {
     startServer: async (cb) => {
         try {
+            await runtime.startServer();
             if (cb) {
                 cb();
             }
@@ -18,6 +19,7 @@ module.exports = {
     },
     stopServer: async (cb) => {
         try {
+            await runtime.stopServer();
             if (cb) {
                 cb();
             }
@@ -75,7 +77,7 @@ module.exports = {
     getNode: registry.getNode,
     awaitNodeInput: async (node, delay = 500) => {
         if (typeof node !== 'object') {
-            node = getNode(node);
+            node = registry.getNode(node);
         }
         if (!node) {
             throw new Error('node does node exist !');

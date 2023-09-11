@@ -24,10 +24,6 @@ for (const key of keys) {
     logApi[key] = (...data) => log(key, ...data);
 }
 function log(level, ...data) {
-    if (!levels[level]) {
-        log(levelsEntries.error, '[LOG] unknown level : ' + level, ...data);
-        return;
-    }
     if (levels[level] < levels[output.logLevel]) {
         return;
     }

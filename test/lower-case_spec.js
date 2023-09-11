@@ -85,4 +85,29 @@ describe('lower-case Node', function () {
             n1.receive({ payload: 'HELLO' });
         });
     });
+    test('should recieve twice the payload !', async function (done) {
+        const flow = [
+            { id: "n1", type: "lower-case", name: "lower-case", wires: [['n2', 'n2']] },
+            { id: "n2", type: "helper" }
+        ];
+        await helper.load(lowerNode, flow);
+        const n1 = helper.getNode("n1");
+        expect(n1.name).toBe('lower-case');
+        setTimeout(() => {
+            n1.receive({ payload: 'UpPeRCaSE !' });
+        })
+        const n2 = helper.getNode("n2");
+        let count = 0;
+        n2.on('input', (msg) => {
+            try {
+                count++;
+                expect(msg).toEqual({ payload: "uppercase !" });
+                if (count === 2) {
+                    done();
+                }
+            } catch (err) {
+                done(err);
+            }
+        })
+    });
 });

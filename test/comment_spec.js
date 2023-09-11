@@ -4,8 +4,8 @@ const helper = require("../index.js");
 const commentNode = require("./nodes/90-comment.js");
 
 describe('comment Node', async function () {
-    beforeAll(() => helper.startServer());
-    afterAll(() => helper.stopServer());
+    beforeAll((done) => helper.startServer(done));
+    afterAll((done) => helper.stopServer(done));
     afterEach(() => helper.unload());
 
     test('should be loaded async', async function () {

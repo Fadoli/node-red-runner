@@ -1,9 +1,8 @@
 {
   "name": "bun-red-test-helper",
   "module": "index.js",
-  "type": "module",
   "scripts": {
-    "test": "bun test --coverage"
+    "test": "bun test --coverage || node --test test/comment_spec.js"
   },
   "devDependencies": {
     "bun-types": "latest"

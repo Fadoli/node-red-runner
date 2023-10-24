@@ -4,7 +4,7 @@ const log = require('./utils/log');
 const registry = require('./registry');
 const context = require('./context');
 const crypto = require('crypto');
-const express = require('express');
+const HyperExpress = require('hyper-express');
 
 const api = {
     // i18n Not implemented
@@ -82,34 +82,17 @@ const output = {
         if (server) {
             return;
         }
-        api.httpNode = express();
-        api.httpAdmin = api.httpNode;
-        return new Promise((res, rej) => {
-            server = api.httpNode.listen(port, (err) => {
-                if (err) {
-                    rej(err);
-                } else {
-                    res();
-                }
-            })
-        })
+        
+        server = new HyperExpress.Server()
+        api.httpAdmin = api.httpNode = server;
+        return server.listen(port);
     },
     async stopServer() {
         if (!server) {
             return;
         }
-        return new Promise((res, rej) => {
-            server.close((err) => {
-                if (err) {
-                    rej(err);
-                } else {
-                    res();
-                }
-            })
-            server = undefined;
-            api.httpNode = undefined;
-            api.httpAdmin = undefined;
-        });
+        server.close()
+        api.httpAdmin = api.httpNode = server = undefined;
     }
 }
 

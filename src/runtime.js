@@ -38,29 +38,37 @@ let server = undefined;
 
 const output = {
     /**
-     * Import a module !
+     * @description Import a module !
      * @param {function} module
+     * @returns {Promise<>}
      */
-    async register(module) {
+    register(module) {
         return Promise.resolve(module(api));
     },
     /**
-     * Clear known modules !
+     * @description Clear known modules !
+     * @returns {Promise<>}
      */
-    async clear() {
-        await output.stop();
+    clear() {
         context.clearContext();
         registry.cleanTypes();
+        return output.stop();
     },
-    async load(flows, credentials) {
+    /**
+     * @description Loads the flows
+     * @param {*} flows
+     * @param {*} credentials
+     * @return {Promise<>} 
+     */
+    load(flows, credentials) {
         return Promise.all(
-            flows.map(async (config) => {
+            flows.map((config) => {
                 const node = new Node(config);
                 if (!registry.knownTypes[config.type]) {
                     throw new Error("Unknown node type : " + config.type);
                 }
-                await registry.knownTypes[config.type].call(node, config)
                 registry.flow[config.id] = node;
+                return registry.knownTypes[config.type].call(node, config);
             })
         );
     },
@@ -69,30 +77,39 @@ const output = {
      * @param {boolean} [isRemoval=true]
      * @return {Promise<>} 
      */
-    async stop(isRemoval = true) {
+    stop(isRemoval = true) {
         const promises = [];
         for (const nodeId in registry.flow) {
             const node = registry.flow[nodeId];
-            promises.push(Promise.all(node.trigger("close", isRemoval)));
+            promises.push(node.trigger("close", isRemoval));
         }
         registry.cleanFlow();
         return Promise.all(promises);
     },
-    async startServer(port = 1880) {
+    /**
+     * @description Starts the web server
+     * @param {number} [port=1880]
+     * @return {Promise<>} 
+     */
+    startServer(port = 1880) {
         if (server) {
-            return;
+            return Promise.resolve();
         }
-        
         server = new HyperExpress.Server()
         api.httpAdmin = api.httpNode = server;
         return server.listen(port);
     },
-    async stopServer() {
+    /**
+     * @description Stops the web server
+     * @return {Promise<>} 
+     */
+    stopServer() {
         if (!server) {
-            return;
+            return Promise.resolve();
         }
         server.close()
         api.httpAdmin = api.httpNode = server = undefined;
+        return Promise.resolve();
     }
 }
 

@@ -1,10 +1,31 @@
 {
-  "name": "bun-red-test-helper",
-  "module": "index.js",
+  "name": "minimal-node-red",
+  "version": "1.0.0",
+  "description": "The goal of this repository is to provide an implementation of node-red-test-helper without using node-red nor nodejs",
   "scripts": {
-    "test": "node --test test/comment_spec.js"
+    "test": "node --test"
   },
   "dependencies": {
     "hyper-express": "^6.8.7"
-  }
+  },
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fadoli/bun-red-test-helper.git"
+  },
+  "keywords": [
+    "nodejs",
+    "node-red",
+    "test-helper"
+  ],
+  "author": "fadoli",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Fadoli/bun-red-test-helper/issues"
+  },
+  "homepage": "https://github.com/Fadoli/bun-red-test-helper#readme"
 }

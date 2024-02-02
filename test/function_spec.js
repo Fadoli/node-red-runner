@@ -444,11 +444,7 @@ describe('function node', function () {
                 if (90000000 < nanoTime && nanoTime < 110000000) {
                     done();
                 } else {
-                    try {
-                        should.fail(null, null, "Delayed time was not between 900 and 1100 ms");
-                    } catch (err) {
-                        done(err);
-                    }
+                    done(new Error("Delayed time was not between 900 and 1100 ms"));
                 }
             });
             var startTime = process.hrtime();

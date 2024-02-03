@@ -26,24 +26,28 @@ const api = {
     util: {
         log: log,
         clone: clone,
+        cloneMessage: clone,
         generateId: () => {
             return crypto.randomUUID();
         }
     },
     httpNode: undefined,
     httpAdmin: undefined,
+    settings: {}
 }
 
-let server = undefined;
+const server = new HyperExpress.Server()
+api.httpAdmin = api.httpNode = server;
+let isServerOpen = false;
 
 const output = {
     /**
      * @description Import a module !
-     * @param {function} module
+     * @param {function} moduleToImport
      * @returns {Promise<>}
      */
-    register(module) {
-        return Promise.resolve(module(api));
+    register(moduleToImport) {
+        return Promise.resolve(moduleToImport(api));
     },
     /**
      * @description Clear known modules !
@@ -65,10 +69,12 @@ const output = {
             flows.map((config) => {
                 const node = new Node(config);
                 if (!registry.knownTypes[config.type]) {
-                    throw new Error("Unknown node type : " + config.type);
+                    // throw new Error("Unknown node type : " + config.type);
+                    console.error("Unknown node type : " + config.type);
+                } else {
+                    registry.flow[config.id] = node;
+                    return registry.knownTypes[config.type].call(node, config);
                 }
-                registry.flow[config.id] = node;
-                return registry.knownTypes[config.type].call(node, config);
             })
         );
     },
@@ -88,15 +94,14 @@ const output = {
     },
     /**
      * @description Starts the web server
-     * @param {number} [port=1880]
+     * @param {number} [port=1888]
      * @return {Promise<>} 
      */
-    startServer(port = 1880) {
-        if (server) {
+    startServer(port = 1888) {
+        if (isServerOpen) {
             return Promise.resolve();
         }
-        server = new HyperExpress.Server()
-        api.httpAdmin = api.httpNode = server;
+        isServerOpen = true;
         return server.listen(port);
     },
     /**
@@ -104,11 +109,11 @@ const output = {
      * @return {Promise<>} 
      */
     stopServer() {
-        if (!server) {
+        if (!isServerOpen) {
             return Promise.resolve();
         }
+        isServerOpen = false;
         server.close()
-        api.httpAdmin = api.httpNode = server = undefined;
         return Promise.resolve();
     }
 }

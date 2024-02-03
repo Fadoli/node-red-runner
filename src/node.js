@@ -56,6 +56,9 @@ class Node {
                     if (Array.isArray(msg)) {
                         msg = msg[0];
                     }
+                    if (!msg) {
+                        return;
+                    }
                     registry.getNode(target).trigger('input', msg);
                 }
             } else {
@@ -63,6 +66,9 @@ class Node {
                 this.send = (msg) => {
                     if (Array.isArray(msg)) {
                         msg = msg[0];
+                    }
+                    if (!msg) {
+                        return;
                     }
                     targets.forEach((target) => { registry.getNode(target).trigger('input', clone(msg)); })
                 }
@@ -105,6 +111,7 @@ class Node {
         log.trace(`[NODE-${this.displayName}] ${str}`, ...options);
     }
     metric() { }
+    status() { }
 
     /**
      * Register an event listener

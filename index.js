@@ -1,6 +1,5 @@
 const runtime = require('./src/runtime');
 const registry = require('./src/registry');
-const helperNode = require('./src/helperNode');
 
 module.exports = {
     startServer: async (cb) => {
@@ -47,7 +46,13 @@ module.exports = {
             // Do the thing !
             const promises = [];
             // Add helper node !
-            promises.push(runtime.register(helperNode));
+            promises.push(runtime.register((RED) => {
+                RED.nodes.registerType("tab", () => { });
+                RED.nodes.registerType("helper", () => { });
+                RED.nodes.registerType("debug", () => { });
+                RED.nodes.registerType("comment", () => { });
+            }));
+
             // Import other nodes
             nodesToImport.forEach(element => {
                 promises.push(runtime.register(element));

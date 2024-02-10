@@ -16,6 +16,7 @@ const api = {
         createNode: (ctx, opts) => {
             // doesn't do anything
         },
+        getNode: registry.getNode,
     },
     library: {
         // Not implemented

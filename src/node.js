@@ -6,7 +6,11 @@ const context = require('./context');
 const NOOP_SEND = function () { }
 
 function wrapOnInput(node, cb) {
-    return (msg) => cb.call(node, msg, node.send, () => { });
+    return (msg) => cb.call(node, msg, node.send, (err) => {
+        if (err) {
+            node.error(err);
+        }
+     });
 }
 
 class Node {

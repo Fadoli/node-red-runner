@@ -44,6 +44,19 @@ const api = {
         cloneMessage: clone,
         generateId: () => {
             return crypto.randomUUID();
+        },
+        evaluateNodeProperty: (...parameters) => {
+            console.log(...parameters)
+            log.warn('[RUNTIME] Missing evaluateNodeProperty in RED.util')
+        },
+        prepareJSONataExpression: () => {
+            log.warn('[RUNTIME] Missing prepareJSONataExpression in RED.util')
+        },
+        evaluateJSONataExpression: () => {
+            log.warn('[RUNTIME] Missing evaluateJSONataExpression in RED.util')
+        },
+        setMessageProperty: () => {
+            log.warn('[RUNTIME] Missing setMessageProperty in RED.util')
         }
     },
     httpNode: undefined,
@@ -84,8 +97,7 @@ const output = {
             flows.map((config) => {
                 const node = new Node(config);
                 if (!registry.knownTypes[config.type]) {
-                    // throw new Error("Unknown node type : " + config.type);
-                    console.error("Unknown node type : " + config.type);
+                    throw new Error("Unknown node type : " + config.type);
                 } else {
                     registry.flow[config.id] = node;
                     return registry.knownTypes[config.type].call(node, config);

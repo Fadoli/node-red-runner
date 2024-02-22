@@ -28,7 +28,7 @@ function clearFlow(flow) {
             disabledIds[node.id] = true;
             return false;
         }
-        if (node.disabled) {
+        if (node.d || node.disabled) {
             disabledIds[node.id] = true;
             return false;
         }

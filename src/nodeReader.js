@@ -56,7 +56,6 @@ class NodeReader {
                 importedModule[node] = this.importFile(appPath, forceRefresh);
             }
         } catch (e) {
-            console.log(e);
             log.error("Failed loading module : " + moduleName + "\nError is :", e);
         }
         this.modules[moduleName] = importedModule;

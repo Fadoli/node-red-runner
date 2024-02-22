@@ -31,7 +31,6 @@ async function baseNodeImporter() {
     } catch (err) {
         console.error("Failed at locating node-red nodes !");
     }
-    console.log(output)
     return output;
 }
 

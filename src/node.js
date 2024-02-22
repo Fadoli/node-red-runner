@@ -160,7 +160,7 @@ class Node {
         if (listeners) {
             for (const listener of listeners) {
                 output.push(
-                    Promise.resolve(listener(...params))
+                    Promise.resolve(listener.call(this,...params))
                         .catch(e => {
                             this.error(e);
                         })
@@ -180,7 +180,7 @@ class Node {
      * @memberof Node
      */
     close(isRemoval = false) {
-        const promises = this.trigger("close", isRemoval);
+        const promises = this.trigger("close", () => {}, isRemoval);
         return Promise.all(promises);
     }
 };

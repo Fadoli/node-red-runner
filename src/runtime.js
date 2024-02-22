@@ -11,6 +11,20 @@ const api = {
     _: () => {
         return "";
     },
+    auth: {
+        needsPermission: (access) => {
+            log.warn('[RUNTIME] Missing needsPermission in RED.auth')
+            return (req,res,next) => {
+                next();
+            }
+        } 
+    },
+    log: {
+        ...log,
+        addHandler: () => {
+            log.warn('[RUNTIME] Missing addHandler in RED.log')
+        }
+    },
     nodes: {
         registerType: registry.registerType,
         createNode: (ctx, opts) => {
@@ -88,7 +102,7 @@ const output = {
         const promises = [];
         for (const nodeId in registry.flow) {
             const node = registry.flow[nodeId];
-            promises.push(node.trigger("close", isRemoval));
+            promises.push(node.close());
         }
         registry.cleanFlow();
         return Promise.all(promises);

@@ -98,11 +98,11 @@ const output = {
      * @param {boolean} [isRemoval=true]
      * @return {Promise<>} 
      */
-    stop(isRemoval = true) {
+    stop() {
         const promises = [];
         for (const nodeId in registry.flow) {
             const node = registry.flow[nodeId];
-            promises.push(node.close());
+            promises.push(node.close(true));
         }
         registry.cleanFlow();
         return Promise.all(promises);

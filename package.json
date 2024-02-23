@@ -1,7 +1,7 @@
 {
-  "name": "minimal-node-red",
+  "name": "@fadoli/node-red-runner",
   "version": "1.0.0",
-  "description": "The goal of this repository is to provide an implementation of node-red-test-helper without using node-red nor nodejs",
+  "description": "Provides an other lighter implementation of node-red runtime and test-helper",
   "scripts": {
     "test": "node --test",
     "start": "node ./runflow.js"

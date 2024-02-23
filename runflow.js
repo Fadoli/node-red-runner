@@ -22,7 +22,7 @@ async function baseNodeImporter() {
                 .then((files) => {
                     files.forEach((fileName) => {
                         if (fileName.endsWith('.js')) {
-                            output.push(path.join(nodesDirectory, subDir, fileName.substring(0, fileName.length - 3)))
+                            output.push(path.join(nodesDirectory, subDir, fileName))
                         }
                     })
                 })
@@ -37,7 +37,10 @@ async function baseNodeImporter() {
 async function run() {
     const nodes = [];
 
-    const importer = new NodeReader(path.join(dirToLoad, "node_modules"));
+    const cleanedFlow = helper.clearFlow(flow);
+    const importer = new NodeReader(path.join(dirToLoad, "node_modules"), true);
+    importer.registerFlows(cleanedFlow);
+
     const baseFiles = await baseNodeImporter();
     baseFiles.forEach((file => {
         nodes.push(importer.importFile(file));
@@ -48,6 +51,7 @@ async function run() {
         });
     });
     await Promise.all(promises);
+    importer.reportNotLoadedNodes();
     await helper.load(nodes, flow);
 
     await helper.startServer();

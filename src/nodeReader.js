@@ -7,10 +7,35 @@ const log = require('./utils/log');
 
 class NodeReader {
 
-    constructor(moduleDirectory = './node_modules/') {
+    constructor(moduleDirectory = './node_modules/', dynamicImport = false) {
+        this.dynamicImport = dynamicImport;
         this.imported = {};
+        this.notImported = {};
         this.modules = {};
         this.moduleDirectory = moduleDirectory;
+        this.usedInFlows = undefined;
+    }
+
+    /**
+     * @description
+     * @param {Array<node>} flows
+     * @memberof NodeReader
+     */
+    registerFlows(flows) {
+        if (!this.dynamicImport) {
+            throw new Error("Use dynamicImport in constructor to enable the feature");
+        }
+        this.usedInFlows = {};
+        flows.forEach(node => {
+            this.usedInFlows[node.type] = true;
+        })
+    }
+
+    reportNotLoadedNodes() {
+        if (!this.dynamicImport) {
+            throw new Error("Use dynamicImport in constructor to enable the feature");
+        }
+        log.info("List of non imported nodes :\n" + JSON.stringify(this.notImported,null,4))
     }
 
     /**
@@ -20,17 +45,40 @@ class NodeReader {
      * @memberof NodeReader
      */
     importFile(filePath, forceRefresh = false) {
-        if (this.imported[filePath]) {
-            if (forceRefresh) {
-                log.trace("Emptying cache and reimporting module " + filePath);
-                delete require.cache[filePath];
-                this.imported[filePath] = require(filePath);
-            } else {
-                log.warn("Module already imported, will use stale data");
-            }
-        } else {
-            this.imported[filePath] = require(filePath);
+        if (this.imported[filePath] && !forceRefresh) {
+            log.warn("Module already imported, will use stale data");
+            return this.imported[filePath];
         }
+
+        if (this.dynamicImport) {
+            if (!this.usedInFlows) {
+                throw new Error("When using dynamicImport, please registerFlows before importing nodes")
+            }
+            const raw = fs.readFileSync(filePath, 'utf8');
+            const prefix = 'nodes.registerType(';
+            const suffix = ',';
+
+            let containsFileToLoad = false;
+            let nodes = [];
+            raw.split(prefix).forEach((shard, index) => {
+                if (index === 0 || containsFileToLoad) {
+                    return;
+                }
+                const trimed = shard.split(suffix)[0].trim();
+                const node = trimed.substring(1, trimed.length - 1);
+                if (this.usedInFlows[node]) {
+                    containsFileToLoad = true;
+                }
+                nodes.push(node);
+            })
+            if (!containsFileToLoad) {
+                nodes.forEach((node) => this.notImported[node] = true)
+                return () => {};
+            }
+        }
+
+        delete require.cache[filePath];
+        this.imported[filePath] = require(filePath);
         return this.imported[filePath];
     }
 

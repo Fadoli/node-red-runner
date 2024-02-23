@@ -146,5 +146,6 @@ module.exports = {
             })
         })
     },
-    init: () => { }
+    init: () => { },
+    clearFlow: clearFlow
 }

@@ -6,6 +6,8 @@ const context = require('./context');
 const crypto = require('crypto');
 const HyperExpress = require('hyper-express');
 
+const nrUtils = require('./utils/node-red');
+
 const api = {
     // i18n Not implemented
     _: () => {
@@ -45,19 +47,21 @@ const api = {
         generateId: () => {
             return crypto.randomUUID();
         },
-        evaluateNodeProperty: (...parameters) => {
-            console.log(...parameters)
-            log.warn('[RUNTIME] Missing evaluateNodeProperty in RED.util')
-        },
-        prepareJSONataExpression: () => {
-            log.warn('[RUNTIME] Missing prepareJSONataExpression in RED.util')
-        },
-        evaluateJSONataExpression: () => {
-            log.warn('[RUNTIME] Missing evaluateJSONataExpression in RED.util')
-        },
-        setMessageProperty: () => {
-            log.warn('[RUNTIME] Missing setMessageProperty in RED.util')
-        }
+        // Imported from NR
+        encodeObject: nrUtils.encodeObject,
+        ensureString: nrUtils.ensureString,
+        ensureBuffer: nrUtils.ensureBuffer,
+        compareObjects: nrUtils.compareObjects,
+        getMessageProperty: nrUtils.getMessageProperty,
+        setMessageProperty: nrUtils.setMessageProperty,
+        getObjectProperty: nrUtils.getObjectProperty,
+        setObjectProperty: nrUtils.setObjectProperty,
+        evaluateNodeProperty: nrUtils.evaluateNodeProperty,
+        normalisePropertyExpression: nrUtils.normalisePropertyExpression,
+        normaliseNodeTypeName: nrUtils.normaliseNodeTypeName,
+        prepareJSONataExpression: nrUtils.prepareJSONataExpression,
+        evaluateJSONataExpression: nrUtils.evaluateJSONataExpression,
+        parseContextStore: nrUtils.parseContextStore,
     },
     httpNode: undefined,
     httpAdmin: undefined,

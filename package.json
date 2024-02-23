@@ -7,13 +7,15 @@
     "start": "node ./runflow.js"
   },
   "dependencies": {
-    "hyper-express": "^6.8.7"
+    "hyper-express": "^6.8.7",
+    "json-stringify-safe": "^5.0.1",
+    "jsonata": "^2.0.3",
+    "moment-timezone": "^0.5.45"
   },
   "main": "index.js",
   "directories": {
     "test": "test"
   },
-  "devDependencies": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Fadoli/bun-red-test-helper.git"

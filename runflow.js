@@ -46,9 +46,7 @@ async function run() {
         nodes.push(importer.importFile(file));
     }))
     const promises = Object.keys(mainpackage.dependencies).map(dep => {
-        return importer.importModule(dep).then((importedModule) => {
-            nodes.push(...Object.values(importedModule));
-        });
+        nodes.push(...importer.importModule(dep));
     });
     await Promise.all(promises);
     importer.reportNotLoadedNodes();

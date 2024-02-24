@@ -27,8 +27,10 @@ function log(level, ...data) {
     if (levels[level] < levels[output.logLevel]) {
         return;
     }
-    const dateStr = (new Date()).toISOString().slice(0, 19).replace(/-/g, "/").replace("T", " ");
-    output.logger(`${dateStr} [${level}] ${data[0]}`);
+    //const dateStr = (new Date()).toISOString().substring(0, 19).replace(/-/g, "/").replace("T", " ");
+    const baseString = (new Date()).toISOString();
+    const dateStr = `${baseString.substring(0, 4)}/${baseString.substring(5, 7)}/${baseString.substring(8, 10)} ${baseString.substring(11,19)}`;
+    output.logger(`${dateStr} [${level}]`, ...data);
 };
 
 const output = {

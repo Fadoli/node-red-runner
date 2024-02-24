@@ -6,7 +6,11 @@ const context = require('./context');
 const NOOP_SEND = function () { }
 
 function wrapOnInput(node, cb) {
-    return (msg) => cb(msg, node.send, () => { });
+    return (msg) => cb.call(node, msg, node.send, (err) => {
+        if (err) {
+            node.error(err);
+        }
+     });
 }
 
 class Node {
@@ -56,7 +60,10 @@ class Node {
                     if (Array.isArray(msg)) {
                         msg = msg[0];
                     }
-                    registry.getNode(target).trigger('input', msg);
+                    if (!msg) {
+                        return;
+                    }
+                    registry.getNode(target).emit('input', msg);
                 }
             } else {
                 const targets = this.wires[0];
@@ -64,7 +71,10 @@ class Node {
                     if (Array.isArray(msg)) {
                         msg = msg[0];
                     }
-                    targets.forEach((target) => { registry.getNode(target).trigger('input', clone(msg)); })
+                    if (!msg) {
+                        return;
+                    }
+                    targets.forEach((target) => { registry.getNode(target).emit('input', clone(msg)); })
                 }
             }
         } else {
@@ -79,7 +89,7 @@ class Node {
                         continue;
                     }
                     const targets = this.wires[id];
-                    targets.forEach((target) => { registry.getNode(target).trigger('input', clone(msg)); })
+                    targets.forEach((target) => { registry.getNode(target).emit('input', clone(msg)); })
                 }
             }
         }
@@ -105,6 +115,7 @@ class Node {
         log.trace(`[NODE-${this.displayName}] ${str}`, ...options);
     }
     metric() { }
+    status() { }
 
     /**
      * Register an event listener
@@ -147,13 +158,13 @@ class Node {
      * @return {Array<Promise>} 
      * @memberof Node
      */
-    trigger(eventName, ...params) {
+    emit(eventName, ...params) {
         const listeners = this.listeners[eventName];
         const output = [];
         if (listeners) {
             for (const listener of listeners) {
                 output.push(
-                    Promise.resolve(listener(...params))
+                    Promise.resolve(listener.call(this,...params))
                         .catch(e => {
                             this.error(e);
                         })
@@ -164,9 +175,7 @@ class Node {
     }
 
     receive(msg) {
-        setImmediate(() => {
-            this.trigger("input", msg);
-        })
+        this.emit("input", msg);
     }
 
     /**
@@ -175,7 +184,7 @@ class Node {
      * @memberof Node
      */
     close(isRemoval = false) {
-        const promises = this.trigger("close", isRemoval);
+        const promises = this.emit("close", () => {}, isRemoval);
         return Promise.all(promises);
     }
 };

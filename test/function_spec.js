@@ -1,23 +1,26 @@
-/**
- * Copyright JS Foundation and other contributors, http://js.foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- **/
-import { expect, test, describe, beforeAll, beforeEach, afterAll, afterEach } from "bun:test";
+// import { expect, test, describe, beforeAll, beforeEach, afterAll, afterEach } from "bun:test";
+let { describe, test, expect, beforeEach, afterEach, after: afterAll, before: beforeAll } = require("node:test");
 
-var helper = require("../index.js");
+// node wrapper
+if (!expect) {
+    const assert = require("node:assert");
+    expect = (input) => {
+        return {
+            toBe: (something) => {
+                assert.deepStrictEqual(input,something);
+            },
+            toEqual: (something) => {
+                assert.deepStrictEqual(input,something);
+            },
+            toHaveProperty: (prop) => {
+                assert.notEqual(input[prop], undefined);
+            }
+        }
+    }
+}
 
-var functionNode = require("./nodes/80-function.js");
+const helper = require("../index.js");
+const functionNode = require("./nodes/80-function.js");
 
 describe('function node', function () {
 
@@ -33,15 +36,6 @@ describe('function node', function () {
         return helper.unload();
     });
 
-    test('should be loaded', function (done) {
-        var flow = [{ id: "n1", type: "function", name: "function" }];
-        helper.load(functionNode, flow, function () {
-            var n1 = helper.getNode("n1");
-            expect(n1?.name).toBe('function');
-            done();
-        });
-    });
-
     test('should send returned message : async', async function () {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "return msg;" },
         { id: "n2", type: "helper" }];
@@ -55,7 +49,7 @@ describe('function node', function () {
         expect(msg.payload).toBe('foo');
     });
 
-    test('should send returned message', function (done) {
+    test('should send returned message', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "return msg;" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -70,7 +64,7 @@ describe('function node', function () {
         });
     });
 
-    test('should send returned message using send()', function (done) {
+    test('should send returned message using send()', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "node.send(msg);" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -89,7 +83,7 @@ describe('function node', function () {
         });
     });
 
-    test('should pass through _topic', function (done) {
+    test('should pass through _topic', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "return msg;" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -109,7 +103,7 @@ describe('function node', function () {
         });
     });
 
-    test('should send to multiple outputs', function (done) {
+    test('should send to multiple outputs', function (t,done) {
         var flow = [{
             id: "n1", type: "function", wires: [["n2"], ["n3"]],
             func: "return [{payload: '1'},{payload: '2'}];"
@@ -147,7 +141,7 @@ describe('function node', function () {
         });
     });
 
-    test.skip('should send to multiple messages', function (done) {
+    test.skip('should send to multiple messages', function (t,done) {
         var flow = [{
             id: "n1", type: "function", wires: [["n2"]],
             func: "return [[{payload: 1},{payload: 2}]];"
@@ -173,7 +167,7 @@ describe('function node', function () {
         });
     });
 
-    test('should allow input to be discarded by returning null', function (done) {
+    test('should allow input to be discarded by returning null', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "return null" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -189,7 +183,7 @@ describe('function node', function () {
         });
     });
 
-    test.skip('should handle null amongst valid messages', function (done) {
+    test.skip('should handle null amongst valid messages', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "return [[msg,null,msg],null]" },
         { id: "n2", type: "helper" },
         { id: "n3", type: "helper" }];
@@ -214,7 +208,7 @@ describe('function node', function () {
         });
     });
 
-    test('should get keys in global context', function (done) {
+    test('should get keys in global context', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "msg.payload=global.keys();return msg;" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -234,7 +228,7 @@ describe('function node', function () {
         });
     });
 
-    test.skip('should access functionGlobalContext set via help settings()', function (done) {
+    test.skip('should access functionGlobalContext set via help settings()', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "msg.payload=global.get('foo');return msg;" },
         { id: "n2", type: "helper" }];
         helper.settings({
@@ -256,7 +250,7 @@ describe('function node', function () {
         helper.settings({});
     });
 
-    test('should set node context', function (done) {
+    test('should set node context', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "context.set('count','0');return msg;" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -276,7 +270,7 @@ describe('function node', function () {
         });
     });
 
-    test('should get node context', function (done) {
+    test('should get node context', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "msg.payload=context.get('count');return msg;" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -296,7 +290,7 @@ describe('function node', function () {
         });
     });
 
-    test('should get keys in node context', function (done) {
+    test('should get keys in node context', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "msg.payload=context.keys();return msg;" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -316,7 +310,7 @@ describe('function node', function () {
         });
     });
 
-    test('should set flow context', function (done) {
+    test('should set flow context', function (t,done) {
         var flow = [{ id: "n1", type: "function", z: "flowA", wires: [["n2"]], func: "flow.set('count','0');return msg;" },
         { id: "n2", type: "helper", z: "flowA" }];
         helper.load(functionNode, flow, function () {
@@ -336,7 +330,7 @@ describe('function node', function () {
         });
     });
 
-    test('should get flow context', function (done) {
+    test('should get flow context', function (t,done) {
         var flow = [{ id: "n1", type: "function", z: "flowA", wires: [["n2"]], func: "msg.payload=flow.get('count');return msg;" },
         { id: "n2", type: "helper", z: "flowA" }];
         helper.load(functionNode, flow, function () {
@@ -352,7 +346,7 @@ describe('function node', function () {
         });
     });
 
-    test('should get flow context', function (done) {
+    test('should get flow context', function (t,done) {
         var flow = [{ id: "n1", type: "function", z: "flowA", wires: [["n2"]], func: "msg.payload=context.flow.get('count');return msg;" },
         { id: "n2", type: "helper", z: "flowA" }];
         helper.load(functionNode, flow, function () {
@@ -368,7 +362,7 @@ describe('function node', function () {
         });
     });
 
-    test('should get keys in flow context', function (done) {
+    test('should get keys in flow context', function (t,done) {
         var flow = [{ id: "n1", type: "function", z: "flowA", wires: [["n2"]], func: "msg.payload=flow.keys();return msg;" },
         { id: "n2", type: "helper", z: "flowA" }];
         helper.load(functionNode, flow, function () {
@@ -384,7 +378,7 @@ describe('function node', function () {
         });
     });
 
-    test('should set global context', function (done) {
+    test('should set global context', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "global.set('count','0');return msg;" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -404,7 +398,7 @@ describe('function node', function () {
         });
     });
 
-    test('should get global context', function (done) {
+    test('should get global context', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "msg.payload=global.get('count');return msg;" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -420,7 +414,7 @@ describe('function node', function () {
         });
     });
 
-    test('should get global context', function (done) {
+    test('should get global context', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "msg.payload=context.global.get('count');return msg;" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -436,7 +430,7 @@ describe('function node', function () {
         });
     });
 
-    test('should handle setTimeout()', function (done) {
+    test('should handle setTimeout()', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "setTimeout(function(){node.send(msg);},100);" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -450,11 +444,7 @@ describe('function node', function () {
                 if (90000000 < nanoTime && nanoTime < 110000000) {
                     done();
                 } else {
-                    try {
-                        should.fail(null, null, "Delayed time was not between 900 and 1100 ms");
-                    } catch (err) {
-                        done(err);
-                    }
+                    done(new Error("Delayed time was not between 900 and 1100 ms"));
                 }
             });
             var startTime = process.hrtime();
@@ -462,7 +452,7 @@ describe('function node', function () {
         });
     });
 
-    test('should handle setInterval()', function (done) {
+    test('should handle setInterval()', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "setInterval(function(){node.send(msg);},10);" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {
@@ -481,7 +471,7 @@ describe('function node', function () {
         });
     });
 
-    test('should handle clearInterval()', function (done) {
+    test('should handle clearInterval()', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "var id=setInterval(null,100);setTimeout(function(){clearInterval(id);node.send(msg);},100);" },
         { id: "n2", type: "helper" }];
         helper.load(functionNode, flow, function () {

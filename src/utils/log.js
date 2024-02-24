@@ -27,9 +27,8 @@ function log(level, ...data) {
     if (levels[level] < levels[output.logLevel]) {
         return;
     }
-
     const dateStr = (new Date()).toISOString().slice(0, 19).replace(/-/g, "/").replace("T", " ");
-    output.logger(`${dateStr} [${level}] ${JSON.stringify}`);
+    output.logger(`${dateStr} [${level}] ${data[0]}`);
 };
 
 const output = {

@@ -18,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Fadoli/bun-red-test-helper.git"
+    "url": "git+https://github.com/Fadoli/node-red-runner.git"
   },
   "keywords": [
     "nodejs",
@@ -28,7 +28,7 @@
   "author": "fadoli",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/Fadoli/bun-red-test-helper/issues"
+    "url": "https://github.com/Fadoli/node-red-runner/issues"
   },
-  "homepage": "https://github.com/Fadoli/bun-red-test-helper#readme"
+  "homepage": "https://github.com/Fadoli/node-red-runner#readme"
 }

@@ -4,7 +4,8 @@
   "description": "Provides an other lighter implementation of node-red runtime and test-helper",
   "scripts": {
     "test": "node --test",
-    "start": "node ./runflow.js"
+    "start": "node ./runflow.js",
+    "start:prof": "node --prof ./runflow.js"
   },
   "dependencies": {
     "hyper-express": "^6.8.7",

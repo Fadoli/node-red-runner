@@ -10,7 +10,7 @@ function wrapOnInput(node, cb) {
         if (err) {
             node.error(err);
         }
-     });
+    });
 }
 
 class Node {
@@ -60,6 +60,7 @@ class Node {
             // Optimisation for single output ... 
             if (this.wires[0].length === 1) {
                 const target = this.wires[0][0];
+                const actualTarget = registry.getNode(target);
                 this.send = (msg) => {
                     if (Array.isArray(msg)) {
                         msg = msg[0];
@@ -67,10 +68,11 @@ class Node {
                     if (!msg) {
                         return;
                     }
-                    registry.getNode(target).emit('input', msg);
+                    actualTarget.emit('input', msg);
                 }
             } else {
                 const targets = this.wires[0];
+                const actualTargets = targets.map((id) => registry.getNode(id));
                 this.send = (msg) => {
                     if (Array.isArray(msg)) {
                         msg = msg[0];
@@ -78,10 +80,11 @@ class Node {
                     if (!msg) {
                         return;
                     }
-                    targets.forEach((target) => { registry.getNode(target).emit('input', clone(msg)); })
+                    actualTargets.forEach((actualTarget, index) => { actualTarget.emit('input', index ? clone(msg) : msg); })
                 }
             }
         } else {
+            // Not optimised use case.
             this.send = (msgArray) => {
                 // handle non array case
                 if (!Array.isArray(msgArray)) {
@@ -168,7 +171,7 @@ class Node {
         if (listeners) {
             for (const listener of listeners) {
                 output.push(
-                    Promise.resolve(listener.call(this,...params))
+                    Promise.resolve(listener.call(this, ...params))
                         .catch(e => {
                             this.error(e);
                         })
@@ -188,7 +191,7 @@ class Node {
      * @memberof Node
      */
     close(isRemoval = false) {
-        const promises = this.emit("close", () => {}, isRemoval);
+        const promises = this.emit("close", () => { }, isRemoval);
         return Promise.all(promises);
     }
 };

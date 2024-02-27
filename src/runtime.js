@@ -104,6 +104,7 @@ const output = {
                     throw new Error("Unknown node type : " + config.type);
                 } else {
                     registry.flow[config.id] = node;
+                    node.credentials = credentials[config.id];
                     return registry.knownTypes[config.type].call(node, config);
                 }
             })

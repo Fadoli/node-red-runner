@@ -27,13 +27,17 @@ class Node {
         // Those are optional
         this.name = config.name;
         this.alias = config._alias;
+        this.wires = config.wires;
 
-        this.updateWires(config.wires);
         this.listeners = {};
         this.displayName = this.alias || this.name || this.id;
 
         this._context = context.getContext(this.id, this.z);
         this.context = () => this._context;
+    }
+
+    start() {
+        this.updateWires();
     }
 
     /**
@@ -42,8 +46,8 @@ class Node {
      * @param {Array<Array<String>>} wires
      * @memberof Node
      */
-    updateWires(wires) {
-        this.wires = wires || [];
+    updateWires() {
+        this.wires = this.wires || [];
         this.wire = undefined;
 
         let wc = 0;

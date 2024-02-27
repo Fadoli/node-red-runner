@@ -97,6 +97,9 @@ const output = {
      * @return {Promise<>} 
      */
     load(flows, credentials) {
+        if (!credentials) {
+            credentials = {};
+        }
         return Promise.all(
             flows.map((config) => {
                 const node = new Node(config);
@@ -108,7 +111,12 @@ const output = {
                     return registry.knownTypes[config.type].call(node, config);
                 }
             })
-        );
+        ).then(() => {
+            for (const id in registry.flow) {
+                const node = registry.flow[id];
+                node.start();
+            }
+        });
     },
     /**
      * Stops the flow and remove the nodes

@@ -1,6 +1,6 @@
+console.time("startup time");
 const fs = require("fs");
 const path = require("path");
-
 const helper = require("./index.js");
 const NodeReader = require("./src/nodeReader");
 
@@ -51,8 +51,9 @@ async function run() {
     await Promise.all(promises);
     importer.reportNotLoadedNodes();
     await helper.load(nodes, flow);
-
     await helper.startServer();
+    console.timeEnd("startup time");
+
     async function stop() {
         await helper.unload();
         await helper.stopServer();

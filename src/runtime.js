@@ -113,7 +113,7 @@ const output = {
             })
         ).then(() => {
             for (const id in registry.flow) {
-                const node = registry.flow[id];
+                const node = registry.getNode(id);
                 node.start();
             }
         });

@@ -48,7 +48,6 @@ class Node {
      */
     updateWires() {
         this.wires = this.wires || [];
-        this.wire = undefined;
 
         let wc = 0;
         for (const wire of this.wires) {
@@ -80,7 +79,9 @@ class Node {
                     if (!msg) {
                         return;
                     }
-                    actualTargets.forEach((actualTarget, index) => { actualTarget.emit('input', index ? clone(msg) : msg); })
+                    actualTargets.forEach((actualTarget, index) => { 
+                        actualTarget.emit('input', clone(msg));
+                    })
                 }
             }
         } else {

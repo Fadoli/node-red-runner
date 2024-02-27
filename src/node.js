@@ -3,7 +3,12 @@ const clone = require("./utils/clone");
 const registry = require("./registry");
 const context = require('./context');
 
-const NOOP_SEND = function () { }
+function NOOP () { }
+function done(err) { 
+    if (err) {
+        console.error(err);
+    }
+}
 
 function wrapOnInput(node, cb) {
     return (msg) => cb.call(node, msg, node.send, (err) => {
@@ -54,7 +59,7 @@ class Node {
             wc += wire.length;
         }
         if (wc === 0) {
-            this.send = NOOP_SEND;
+            this.send = NOOP;
         } else if (this.wires.length === 1) {
             // Optimisation for single output ... 
             if (this.wires[0].length === 1) {
@@ -67,7 +72,7 @@ class Node {
                     if (!msg) {
                         return;
                     }
-                    actualTarget.emit('input', msg);
+                    actualTarget.receive(msg);
                 }
             } else {
                 const targets = this.wires[0];
@@ -79,8 +84,8 @@ class Node {
                     if (!msg) {
                         return;
                     }
-                    actualTargets.forEach((actualTarget, index) => { 
-                        actualTarget.emit('input', clone(msg));
+                    actualTargets.forEach((actualTarget) => { 
+                        actualTarget.receive(clone(msg));
                     })
                 }
             }
@@ -97,7 +102,7 @@ class Node {
                         continue;
                     }
                     const targets = this.wires[id];
-                    targets.forEach((target) => { registry.getNode(target).emit('input', clone(msg)); })
+                    targets.forEach((target) => { registry.getNode(target).receive(clone(msg)); })
                 }
             }
         }
@@ -183,7 +188,10 @@ class Node {
     }
 
     receive(msg) {
-        this.emit("input", msg);
+        const listeners = this.listeners["input"];
+        for (const listener of listeners) {
+            listener(msg, this.send, done);
+        }
     }
 
     /**

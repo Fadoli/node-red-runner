@@ -1,11 +1,113 @@
 const runtime = require('./src/runtime');
 const registry = require('./src/registry');
 
+const clone = require('./src/utils/node-red').clone
+
+/**
+ * @description Compile flows to instantiate subflows
+ * @param {*} flow
+ */
+function compileSubflow(flow) {
+    const subflowRegister = {};
+    flow.forEach((node) => {
+        if (node.type === 'subflow') {
+            subflowRegister[node.id] = {
+                config: node,
+                instances: [],
+                actualFlow: []
+            };
+        } else if (node.type.startsWith('subflow:')) {
+            subflowRegister[instanceOfSubflow].instances.push(node);
+        }
+        // This is in a subflow
+        if (subflowRegister[node.z]) {
+            subflowRegister[node.z].actualFlow.push(node);
+        }
+    })
+
+    /*
+    "in": [
+        {
+            "x": 80,
+            "y": 80,
+            "wires": [
+                {
+                    "id": "4acdc4f13287ab40"
+                }
+            ]
+        }
+    ],
+    "out": [
+        {
+            "x": 640,
+            "y": 80,
+            "wires": [
+                {
+                    "id": "b9bd378d5071d32f",
+                    "port": 0
+                }
+            ]
+        }
+    ],
+    "env": [
+        {
+            "name": "var",
+            "type": "str",
+            "value": "string"
+        }
+    ],
+    */
+
+    /**
+     * @description This generates subflows
+     * @param {*} instanceId
+     * @param {{config: node, instances: Array<node>, actualFlow: Array<node>}} subflowData
+     * @returns {Array<node>}
+     */
+    function generateSubflow(instanceNode, subflowData) {
+        let output = [];
+        const endWire = subflowDat.config;
+        subflowData.actualFlow.forEach((node) => {
+            const newNode = clone(node);
+            newNode.id = `${instanceNode.id}:${newNode.id}`;
+            newNode.z = instanceNode.z;
+            newNode.wires.map(wires => {
+                return wires.map((wire) => {
+                    if (wire === endWire) {
+                        return endWire;
+                    }
+                })
+            })
+        })
+    }
+
+    for (const id in subflowRegister) {
+        const element = subflowRegister[id];
+
+        // disable subflows that are empty or have no instances
+        if (!element.instances.length || !element.actualFlow.length) {
+            element.config.disabled = true;
+            element.instances.forEach((node) => {
+                node.disabled = true;
+            })
+            element.actualFlow.forEach((node) => {
+                node.disabled = true;
+            })
+            // stop here
+            continue;
+        }
+
+        element.instances.forEach((node) => {
+            node.disabled = true;
+        })
+    }
+}
+
 // This will remove all non necessary nodes.
 /**
  * @description
- * @param {Array<nodes>} flow
- * @returns {Array<nodes>} 
+ * @param {Array<node>} flow
+ * @returns {Array<node>} 
  */
 function clearFlow(flow) {
     const disabledFlows = {};

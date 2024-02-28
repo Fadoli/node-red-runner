@@ -970,6 +970,7 @@ function encodeObject(msg,opts) {
 }
 
 module.exports = {
+    clone: clone,
     cloneMessage: cloneMessage,
     encodeObject: encodeObject,
     ensureString: ensureString,

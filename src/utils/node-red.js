@@ -17,12 +17,43 @@
  * From : https://github.com/node-red/node-red/blob/master/packages/node_modules/%40node-red/util/lib/util.js
  **/
 
+const clone = require("fast-copy").default;
 const jsonata = require("jsonata");
 const moment = require("moment-timezone");
 const safeJSONStringify = require("json-stringify-safe");
 const util = require("util");
 const { hasOwnProperty } = Object.prototype;
 const log = require("./log")
+
+/**
+ * Safely clones a message object. This handles msg.req/msg.res objects that must
+ * not be cloned.
+ *
+ * @param  {any}    msg - the message object to clone
+ * @return {Object} the cloned message
+ * @memberof @node-red/util_util
+ */
+function cloneMessage(msg) {
+    if (typeof msg !== "undefined" && msg !== null) {
+        // Temporary fix for #97
+        // TODO: remove this http-node-specific fix somehow
+        var req = msg.req;
+        var res = msg.res;
+        delete msg.req;
+        delete msg.res;
+        var m = clone(msg);
+        if (req) {
+            m.req = req;
+            msg.req = req;
+        }
+        if (res) {
+            m.res = res;
+            msg.res = res;
+        }
+        return m;
+    }
+    return msg;
+}
 
 /**
  * Safely returns the object construtor name.
@@ -939,6 +970,7 @@ function encodeObject(msg,opts) {
 }
 
 module.exports = {
+    cloneMessage: cloneMessage,
     encodeObject: encodeObject,
     ensureString: ensureString,
     ensureBuffer: ensureBuffer,

@@ -1,4 +1,4 @@
-const clone = require('./utils/clone');
+const clone = require("./utils/node-red").cloneMessage;
 const Node = require('./node');
 const log = require('./utils/log');
 const registry = require('./registry');
@@ -10,8 +10,8 @@ const nrUtils = require('./utils/node-red');
 
 const api = {
     // i18n Not implemented
-    _: () => {
-        return "";
+    _: (...stuff) => {
+        return stuff;
     },
     auth: {
         needsPermission: (access) => {
@@ -97,6 +97,9 @@ const output = {
      * @return {Promise<>} 
      */
     load(flows, credentials) {
+        if (!credentials) {
+            credentials = {};
+        }
         return Promise.all(
             flows.map((config) => {
                 const node = new Node(config);
@@ -104,10 +107,16 @@ const output = {
                     throw new Error("Unknown node type : " + config.type);
                 } else {
                     registry.flow[config.id] = node;
+                    node.credentials = credentials[config.id];
                     return registry.knownTypes[config.type].call(node, config);
                 }
             })
-        );
+        ).then(() => {
+            for (const id in registry.flow) {
+                const node = registry.getNode(id);
+                node.start();
+            }
+        });
     },
     /**
      * Stops the flow and remove the nodes

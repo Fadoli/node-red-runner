@@ -5,7 +5,7 @@ const helper = require("./index.js");
 const NodeReader = require("./src/nodeReader");
 
 
-const dirToLoad = "~/.node-red"
+const dirToLoad = "C:/Users/Franck/.node-red"
 
 const mainpackage = require(path.join(dirToLoad, "package.json"));
 const flow = require(path.join(dirToLoad, "flows_PC-Franck.json"));
@@ -42,8 +42,8 @@ async function run() {
     const promises = [];
     importer.registerFlows(cleanedFlow);
     promises.push(baseNodeImporter().then((baseFiles) => {
-    baseFiles.forEach((file => {
-        nodes.push(importer.importFile(file));
+        baseFiles.forEach((file => {
+            nodes.push(importer.importFile(file));
         }))
     }))
     promises.push(helper.startServer())
@@ -60,7 +60,7 @@ async function run() {
         await helper.stopServer();
         process.exit(0);
     }
-    
+
     process.on("SIGABRT", stop);
     process.on("SIGBUS", stop);
     process.on("SIGBREAK", stop);

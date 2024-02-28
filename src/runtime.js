@@ -4,9 +4,10 @@ const log = require('./utils/log');
 const registry = require('./registry');
 const context = require('./context');
 const crypto = require('crypto');
-const HyperExpress = require('hyper-express');
-
+const express = require('express');
 const nrUtils = require('./utils/node-red');
+
+const http = require("http");
 
 const api = {
     // i18n Not implemented
@@ -68,9 +69,10 @@ const api = {
     settings: {}
 }
 
-const server = new HyperExpress.Server()
-api.httpAdmin = api.httpNode = server;
-let isServerOpen = false;
+const app = express()
+api.httpAdmin = api.httpNode = app;
+let serverPromise = undefined;
+let server;
 
 const output = {
     /**
@@ -138,23 +140,39 @@ const output = {
      * @return {Promise<>} 
      */
     startServer(port = 1888) {
-        if (isServerOpen) {
-            return Promise.resolve();
+        if (serverPromise) {
+            return serverPromise;
         }
-        isServerOpen = true;
-        return server.listen(port);
+        serverPromise = new Promise((resolve,reject) => {
+            server = http.createServer(app);
+            server.listen(port, (err) => {
+                if (err) {
+                    reject(err);
+                    server = undefined;
+                    serverPromise = undefined;
+                } else {
+                    resolve();
+                }
+            })
+        })
+        return serverPromise;
     },
     /**
      * @description Stops the web server
      * @return {Promise<>} 
      */
     stopServer() {
-        if (!isServerOpen) {
+        if (!serverPromise) {
             return Promise.resolve();
         }
-        isServerOpen = false;
-        server.close()
-        return Promise.resolve();
+        return serverPromise.then(() => {
+            if (server) {
+                server.closeAllConnections();
+                server.close();
+                server = undefined;
+            }
+            serverPromise = undefined;
+        });
     }
 }
 

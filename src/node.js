@@ -1,5 +1,5 @@
 const log = require("./utils/log");
-const clone = require("./utils/clone");
+const clone = require("./utils/node-red").cloneMessage;
 const registry = require("./registry");
 const context = require('./context');
 
@@ -69,6 +69,9 @@ class Node {
                     if (Array.isArray(msg)) {
                         msg = msg[0];
                     }
+                    if (Array.isArray(msg)) {
+                        msg = msg[0];
+                    }
                     if (!msg) {
                         return;
                     }
@@ -78,6 +81,9 @@ class Node {
                 const targets = this.wires[0];
                 const actualTargets = targets.map((id) => registry.getNode(id));
                 this.send = (msg) => {
+                    if (Array.isArray(msg)) {
+                        msg = msg[0];
+                    }
                     if (Array.isArray(msg)) {
                         msg = msg[0];
                     }

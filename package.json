@@ -1,35 +1,36 @@
 {
-  "name": "@fadoli/node-red-runner",
-  "version": "1.0.0",
-  "description": "Provides an other lighter implementation of node-red runtime and test-helper",
-  "scripts": {
-    "test": "node --test",
-    "start": "node ./runflow.js",
-    "start:prof": "node --prof ./runflow.js"
-  },
-  "dependencies": {
-    "hyper-express": "^6.8.7",
-    "json-stringify-safe": "^5.0.1",
-    "jsonata": "^2.0.3",
-    "moment-timezone": "^0.5.45"
-  },
-  "main": "index.js",
-  "directories": {
-    "test": "test"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Fadoli/node-red-runner.git"
-  },
-  "keywords": [
-    "nodejs",
-    "node-red",
-    "test-helper"
-  ],
-  "author": "fadoli",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/Fadoli/node-red-runner/issues"
-  },
-  "homepage": "https://github.com/Fadoli/node-red-runner#readme"
+    "name": "@fadoli/node-red-runner",
+    "version": "1.0.0",
+    "description": "Provides an other lighter implementation of node-red runtime and test-helper",
+    "scripts": {
+        "test": "node --test",
+        "start": "node ./runflow.js",
+        "start:prof": "node --prof ./runflow.js"
+    },
+    "dependencies": {
+        "hyper-express": "^6.8.7",
+        "fast-copy": "^3.0.1",
+        "json-stringify-safe": "^5.0.1",
+        "jsonata": "^2.0.3",
+        "moment-timezone": "^0.5.45"
+    },
+    "main": "index.js",
+    "directories": {
+        "test": "test"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Fadoli/node-red-runner.git"
+    },
+    "keywords": [
+        "nodejs",
+        "node-red",
+        "test-helper"
+    ],
+    "author": "fadoli",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/Fadoli/node-red-runner/issues"
+    },
+    "homepage": "https://github.com/Fadoli/node-red-runner#readme"
 }

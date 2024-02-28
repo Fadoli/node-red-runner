@@ -1,4 +1,4 @@
-const clone = require('./utils/clone');
+const clone = require("./utils/node-red").cloneMessage;
 const Node = require('./node');
 const log = require('./utils/log');
 const registry = require('./registry');
@@ -10,8 +10,8 @@ const nrUtils = require('./utils/node-red');
 
 const api = {
     // i18n Not implemented
-    _: () => {
-        return "";
+    _: (...stuff) => {
+        return stuff;
     },
     auth: {
         needsPermission: (access) => {

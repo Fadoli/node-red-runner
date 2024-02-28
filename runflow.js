@@ -39,17 +39,18 @@ async function run() {
 
     const cleanedFlow = helper.clearFlow(flow);
     const importer = new NodeReader(path.join(dirToLoad, "node_modules"), true);
+    const promises = [];
     importer.registerFlows(cleanedFlow);
-
-    const baseFiles = await baseNodeImporter();
+    promises.push(baseNodeImporter().then((baseFiles) => {
     baseFiles.forEach((file => {
-        nodes.push(importer.importFile(file));
+            nodes.push(importer.importFile(file));
+        }))
     }))
-    const promises = Object.keys(mainpackage.dependencies).map(dep => {
+    Object.keys(mainpackage.dependencies).map(dep => {
         nodes.push(...importer.importModule(dep));
     });
     await Promise.all(promises);
-    importer.reportNotLoadedNodes();
+    // importer.reportNotLoadedNodes();
     await helper.load(nodes, flow);
     await helper.startServer();
     console.timeEnd("startup time");

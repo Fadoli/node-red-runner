@@ -1,1 +1,0 @@
-module.exports = (stuff) => JSON.parse(JSON.stringify(stuff));

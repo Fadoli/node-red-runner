@@ -30,6 +30,6 @@
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/Fadoli/node-red-runner/issues"
-  },
-  "homepage": "https://github.com/Fadoli/node-red-runner#readme"
+    },
+    "homepage": "https://github.com/Fadoli/node-red-runner#readme"
 }

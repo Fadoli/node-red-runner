@@ -23,6 +23,6 @@ Some additionnal optimisation are planned like the usage of "compiled" node.send
 
 As of now (2024/02/23), a small flow with mostly only node-red nodes perform better in several metrics :
 
-1. Startup time is heavily improved
-1. Memory consumption is improved in the case of small flows (NR uses around ~50-75MB whereas this use only ~25-30MB)
+1. Startup time is improved
+1. Memory consumption is improved in the case of small flows (NR uses around ~70MB whereas this use only ~22MB)
 1. CPU usage is improved as well due to the simplification of the runtime

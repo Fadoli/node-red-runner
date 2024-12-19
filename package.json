@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "description": "Provides an other lighter implementation of node-red runtime and test-helper",
     "scripts": {
-        "test": "node --test",
+        "test": "node --experimental-test-coverage --test --test-reporter=spec",
         "start": "node ./runflow.js",
         "start:prof": "node --prof ./runflow.js"
     },

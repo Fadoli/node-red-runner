@@ -12,12 +12,12 @@
         "fast-copy": "^3.0.1",
         "json-stringify-safe": "^5.0.1",
         "jsonata": "^2.0.3",
-        "moment-timezone": "^0.5.45"
+        "moment-timezone": "^0.6.0"
     },
     "main": "index.js",
     "directories": {
         "test": "test"
-    },
+    }, 
     "repository": {
         "type": "git",
         "url": "git+https://github.com/Fadoli/node-red-runner.git"

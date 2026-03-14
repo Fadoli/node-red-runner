@@ -1,24 +1,32 @@
 let ctx = {};
+let ctx_build = {};
 
 function buildContextFor(id) {
-    ctx[id] ??= {};
-    const myCtx = ctx[id];
-    return {
-        get: (key) => {
-            const value = myCtx[key];
-            // console.log(`get ${key} = ${value}`);
-            return value;
-        },
-        set: (key, value) => {
-            // console.log(`Set ${value} into ${key}`);
-            myCtx[key] = value;
-        },
-        keys: () => {
-            const keys = Object.keys(myCtx);
-            // console.log(`Keys ${keys}`);
-            return keys;
-        }
-    };
+    if (!ctx_build[id]) {
+        ctx[id] ??= {};
+        const myCtx = ctx[id];
+        ctx_build[id] = {
+            get: (key) => {
+                const value = myCtx[key];
+                // console.log(`get ${key} = ${value}`);
+                return value;
+            },
+            set: (key, value) => {
+                // console.log(`Set ${value} into ${key}`);
+                if (value === undefined) {
+                    delete myCtx[key];
+                } else {
+                    myCtx[key] = value;
+                }
+            },
+            keys: () => {
+                const keys = Object.keys(myCtx);
+                // console.log(`Keys ${keys}`);
+                return keys;
+            }
+        };
+    }
+    return ctx_build[id];
 }
 
 function getContext(nodeId, flowId) {

@@ -17,7 +17,7 @@
  * From : https://github.com/node-red/node-red/blob/master/packages/node_modules/%40node-red/util/lib/util.js
  **/
 
-const clone = require("fast-copy").default;
+const clone = require("fast-copy").copy;
 const jsonata = require("jsonata");
 const moment = require("moment-timezone");
 const safeJSONStringify = require("json-stringify-safe");

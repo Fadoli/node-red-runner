@@ -2,8 +2,8 @@ let ctx = {};
 let ctx_build = {};
 
 function buildContextFor(id) {
+    ctx[id] ??= {};
     if (!ctx_build[id]) {
-        ctx[id] ??= {};
         const myCtx = ctx[id];
         ctx_build[id] = {
             get: (key) => {
@@ -45,5 +45,6 @@ module.exports = {
     getContext,
     clearContext: () => {
         ctx = {};
+        ctx_build = {};
     }
 };

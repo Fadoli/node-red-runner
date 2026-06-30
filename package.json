@@ -17,7 +17,7 @@
     "main": "index.js",
     "directories": {
         "test": "test"
-    }, 
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/Fadoli/node-red-runner.git"

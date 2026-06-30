@@ -128,6 +128,9 @@ module.exports = {
         await runtime.stop();
         await runtime.load(flows, creds);
     },
+    settings: (newSettings) => {
+        return runtime.settings(newSettings);
+    },
     getNode: registry.getNode,
     awaitNodeInput: async (node, delay = 500) => {
         if (typeof node !== 'object') {

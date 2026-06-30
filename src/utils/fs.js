@@ -67,7 +67,8 @@ async function writeJSON(filePath, data, options = {}) {
     
     let shouldCompress = options.compress;
     if (shouldCompress === undefined) {
-        shouldCompress = content.length > COMPRESSION_THRESHOLD;
+        const compressionThreshold = options.compressionThreshold ?? COMPRESSION_THRESHOLD;
+        shouldCompress = content.length > compressionThreshold;
     }
 
     if (shouldCompress) {

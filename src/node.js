@@ -28,6 +28,7 @@ class Node {
     constructor(config) {
         this.id = config.id;
         this.type = config.type;
+        this.z = config.z;
 
         // Those are optional
         this.name = config.name;

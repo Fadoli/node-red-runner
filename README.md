@@ -19,6 +19,32 @@ To achieve this goal, here are the main differences :
 
 Some additionnal optimisation are planned like the usage of "compiled" node.send functions, simplified context management ...
 
+## Context persistence
+
+Context storage can now be persisted to disk through helper settings. When `contextStorage.file` is set, the runtime reloads the stored context before flows start and periodically flushes updates back to disk.
+
+```js
+const helper = require('@fadoli/node-red-runner');
+
+helper.settings({
+    contextStorage: {
+        file: './.node-red-runner/context.json',
+        saveInterval: 5000,
+        compressionThreshold: 256 * 1024,
+    },
+});
+```
+
+The configured `file` acts as the storage root name. With the example above, the runtime writes:
+
+```text
+./.node-red-runner/context/global.json
+./.node-red-runner/context/<flow-id>.json
+./.node-red-runner/context/<flow-id>/<node-id>.json
+```
+
+Files above `compressionThreshold` are automatically compressed with built-in zlib so no extra dependency is required.
+
 ## Some numbers
 
 As of now (2024/02/23), a small flow with mostly only node-red nodes perform better in several metrics :

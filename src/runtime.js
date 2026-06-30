@@ -85,10 +85,11 @@ const output = {
      * @description Clear known modules !
      * @returns {Promise<>}
      */
-    clear() {
+    async clear() {
+        await output.stop();
+        await context.stop();
         context.clearContext();
         registry.cleanTypes();
-        return output.stop();
     },
     /**
      * @description Loads the flows
@@ -96,11 +97,12 @@ const output = {
      * @param {*} credentials
      * @return {Promise<>} 
      */
-    load(flows, credentials) {
+    async load(flows, credentials) {
         if (!credentials) {
             credentials = {};
         }
-        return Promise.all(
+        await context.start(api.settings.contextStorage);
+        await Promise.all(
             flows.map((config) => {
                 const node = new Node(config);
                 if (!registry.knownTypes[config.type]) {
@@ -111,26 +113,26 @@ const output = {
                     return registry.knownTypes[config.type].call(node, config);
                 }
             })
-        ).then(() => {
-            for (const id in registry.flow) {
-                const node = registry.getNode(id);
-                node.start();
-            }
-        });
+        );
+        for (const id in registry.flow) {
+            const node = registry.getNode(id);
+            node.start();
+        }
     },
     /**
      * Stops the flow and remove the nodes
      * @param {boolean} [isRemoval=true]
      * @return {Promise<>} 
      */
-    stop() {
+    async stop() {
         const promises = [];
         for (const nodeId in registry.flow) {
             const node = registry.flow[nodeId];
             promises.push(node.close(true));
         }
         registry.cleanFlow();
-        return Promise.all(promises);
+        await Promise.all(promises);
+        await context.saveNow();
     },
     /**
      * @description Starts the web server
@@ -155,6 +157,13 @@ const output = {
         isServerOpen = false;
         server.close()
         return Promise.resolve();
+    },
+    settings(newSettings) {
+        api.settings = newSettings || {};
+        return api.settings;
+    },
+    getSettings() {
+        return api.settings;
     }
 }
 

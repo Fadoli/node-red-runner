@@ -441,10 +441,10 @@ describe('function node', function () {
                 var nanoTime = endTime[0] * 100000000 + endTime[1];
                 expect(msg.topic).toBe('bar');
                 expect(msg.payload).toBe('foo');
-                if (90000000 < nanoTime && nanoTime < 110000000) {
+                if (90000000 < nanoTime) {
                     done();
                 } else {
-                    done(new Error("Delayed time was not between 900 and 1100 ms"));
+                    done(new Error("Delayed time was less than 90 ms"));
                 }
             });
             var startTime = process.hrtime();

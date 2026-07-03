@@ -8,6 +8,15 @@ module.exports = {
 
     sendResults(node, send, _msgid, msgs, cloneFirstMessage) {
         if (msgs) {
+            const outputs = Array.isArray(msgs) ? msgs : [msgs];
+            outputs.forEach((output) => {
+                const messages = Array.isArray(output) ? output : [output];
+                messages.forEach((msg) => {
+                    if (msg && msg._msgid === undefined) {
+                        msg._msgid = _msgid;
+                    }
+                });
+            });
             send(msgs);
         }
     },

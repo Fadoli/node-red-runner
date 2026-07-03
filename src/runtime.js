@@ -164,10 +164,9 @@ const output = {
     /**
      * @description Import a module !
      * @param {function} moduleToImport
-     * @returns {Promise<>}
      */
     register(moduleToImport) {
-        return Promise.resolve(moduleToImport(api));
+        return moduleToImport(api);
     },
     /**
      * @description Clear known modules !
@@ -208,9 +207,16 @@ const output = {
             node.credentials = credentials[config.id];
         });
         for (const phase of phases) {
-            await Promise.all(phase.map((config) => {
-                return registry.knownTypes[config.type].call(registry.flow[config.id], config);
-            }));
+            const pending = [];
+            phase.forEach((config) => {
+                const result = registry.knownTypes[config.type].call(registry.flow[config.id], config);
+                if (result && typeof result.then === 'function') {
+                    pending.push(result);
+                }
+            });
+            if (pending.length) {
+                await Promise.all(pending);
+            }
         }
         for (const id in registry.flow) {
             const node = registry.getNode(id);
@@ -226,10 +232,15 @@ const output = {
         const promises = [];
         for (const nodeId in registry.flow) {
             const node = registry.flow[nodeId];
-            promises.push(node.close(true));
+            const result = node.close(true);
+            if (result && typeof result.then === 'function') {
+                promises.push(result);
+            }
         }
         registry.cleanFlow();
-        await Promise.all(promises);
+        if (promises.length) {
+            await Promise.all(promises);
+        }
         await context.saveNow();
     },
     /**

@@ -4,18 +4,24 @@ const registry = require("./registry");
 const context = require('./context');
 
 function NOOP () { }
-function done(err) { 
-    if (err) {
-        console.error(err);
+
+function sendMessage(targets, msg) {
+    if (msg === null || msg === undefined) {
+        return;
+    }
+    if (targets.length === 1) {
+        targets[0].receive(msg);
+    } else {
+        targets.forEach((target) => target.receive(clone(msg)));
     }
 }
 
-function wrapOnInput(node, cb) {
-    return (msg) => cb.call(node, msg, node.send, (err) => {
-        if (err) {
-            node.error(err);
-        }
-    });
+function sendOutput(targets, output) {
+    if (Array.isArray(output)) {
+        output.forEach((msg) => sendMessage(targets, msg));
+    } else {
+        sendMessage(targets, output);
+    }
 }
 
 class Node {
@@ -56,62 +62,33 @@ class Node {
         this.wires = this.wires || [];
 
         let wc = 0;
-        for (const wire of this.wires) {
+        this.wires.forEach((wire) => {
             wc += wire.length;
-        }
+        });
         if (wc === 0) {
             this.send = NOOP;
-        } else if (this.wires.length === 1) {
-            // Optimisation for single output ... 
-            if (this.wires[0].length === 1) {
-                const target = this.wires[0][0];
-                const actualTarget = registry.getNode(target);
-                this.send = (msg) => {
-                    if (Array.isArray(msg)) {
-                        msg = msg[0];
-                    }
-                    if (Array.isArray(msg)) {
-                        msg = msg[0];
-                    }
-                    if (!msg) {
-                        return;
-                    }
-                    actualTarget.receive(msg);
-                }
-            } else {
-                const targets = this.wires[0];
-                const actualTargets = targets.map((id) => registry.getNode(id));
-                this.send = (msg) => {
-                    if (Array.isArray(msg)) {
-                        msg = msg[0];
-                    }
-                    if (Array.isArray(msg)) {
-                        msg = msg[0];
-                    }
-                    if (!msg) {
-                        return;
-                    }
-                    actualTargets.forEach((actualTarget) => { 
-                        actualTarget.receive(clone(msg));
-                    })
-                }
-            }
+            return;
+        }
+
+        const targetsByOutput = this.wires.map((wire) => {
+            return wire.map((id) => registry.getNode(id));
+        });
+        if (targetsByOutput.length === 1) {
+            const targets = targetsByOutput[0];
+            this.send = (messages) => {
+                sendOutput(targets, Array.isArray(messages) ? messages[0] : messages);
+            };
         } else {
-            // Not optimised use case.
-            this.send = (msgArray) => {
-                // handle non array case
-                if (!Array.isArray(msgArray)) {
-                    msgArray = [msgArray];
+            this.send = (messages) => {
+                if (!Array.isArray(messages)) {
+                    sendMessage(targetsByOutput[0], messages);
+                    return;
                 }
-                for (let id = 0; id < msgArray.length; id++) {
-                    const msg = msgArray[id];
-                    if (!msg) {
-                        continue;
-                    }
-                    const targets = this.wires[id];
-                    targets.forEach((target) => { registry.getNode(target).receive(clone(msg)); })
+                const outputCount = Math.min(messages.length, targetsByOutput.length);
+                for (let output = 0; output < outputCount; output++) {
+                    sendOutput(targetsByOutput[output], messages[output]);
                 }
-            }
+            };
         }
     }
 
@@ -147,10 +124,6 @@ class Node {
         if (!this.listeners[eventName]) {
             this.listeners[eventName] = [];
         }
-        // Hack for injecting send and done
-        if (eventName === 'input') {
-            cb = wrapOnInput(this, cb);
-        }
         this.listeners[eventName].push(cb);
     }
 
@@ -183,32 +156,76 @@ class Node {
         const output = [];
         if (listeners) {
             for (const listener of listeners) {
-                output.push(
-                    Promise.resolve(listener.call(this, ...params))
-                        .catch(e => {
-                            this.error(e);
-                        })
-                );
+                try {
+                    const result = listener.call(this, ...params);
+                    if (result && typeof result.then === 'function') {
+                        output.push(result.catch((err) => this.error(err)));
+                    }
+                } catch (err) {
+                    this.error(err);
+                }
             }
         }
         return output;
     }
 
     receive(msg) {
-        const listeners = this.listeners["input"];
-        for (const listener of listeners) {
-            listener(msg, this.send, done);
-        }
+        const listeners = this.listeners.input || [];
+        const done = (err) => {
+            if (err) {
+                this.error(err, msg);
+            }
+        };
+        listeners.forEach((listener) => {
+            try {
+                const result = listener.call(this, msg, this.send, done);
+                if (result && typeof result.then === 'function') {
+                    result.catch(done);
+                }
+            } catch (err) {
+                done(err);
+            }
+        });
     }
 
     /**
      * Called when a node is stopped or removed
      * @param {Boolean} [isRemoval]
-     * @memberof Node
      */
     close(isRemoval = false) {
-        const promises = this.emit("close", () => { }, isRemoval);
-        return Promise.all(promises);
+        const listeners = this.listeners.close || [];
+        const pending = [];
+        listeners.forEach((listener) => {
+            if (listener.length > 0) {
+                pending.push(new Promise((resolve, reject) => {
+                    const done = (err) => err ? reject(err) : resolve();
+                    try {
+                        if (listener.length === 1) {
+                            listener.call(this, done);
+                        } else {
+                            listener.call(this, isRemoval, done);
+                        }
+                    } catch (err) {
+                        reject(err);
+                    }
+                }));
+                return;
+            }
+            try {
+                const result = listener.call(this);
+                if (result && typeof result.then === 'function') {
+                    pending.push(result);
+                }
+            } catch (err) {
+                pending.push(Promise.reject(err));
+            }
+        });
+        if (pending.length === 1) {
+            return pending[0];
+        }
+        if (pending.length > 1) {
+            return Promise.all(pending);
+        }
     }
 };
 

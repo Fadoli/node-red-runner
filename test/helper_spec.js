@@ -130,6 +130,56 @@ describe('helper spec', function () {
         assert.strictEqual(constructed, 2);
     });
 
+    test('passes send and done to input handlers', async function () {
+        const errors = [];
+        const nodes = (RED) => {
+            RED.nodes.registerType("input-node", function () {
+                this.on("input", (msg, send, done) => {
+                    assert.strictEqual(send, this.send);
+                    done(new Error(msg.payload));
+                });
+            });
+        };
+
+        await helper.load(nodes, [{ id: "input", type: "input-node", wires: [] }]);
+        const node = helper.getNode("input");
+        node.error = (err, msg) => errors.push([err.message, msg.payload]);
+        await node.receive({ payload: "failed" });
+        assert.deepStrictEqual(errors, [["failed", "failed"]]);
+    });
+
+    test('waits for every close handler style', async function () {
+        const closed = [];
+        const nodes = (RED) => {
+            RED.nodes.registerType("close-node", function () {
+                this.on("close", () => {
+                    closed.push("sync");
+                });
+                this.on("close", (done) => {
+                    setImmediate(() => {
+                        closed.push("callback");
+                        done();
+                    });
+                });
+                this.on("close", (removed, done) => {
+                    assert.strictEqual(removed, true);
+                    setImmediate(() => {
+                        closed.push("removed");
+                        done();
+                    });
+                });
+                this.on("close", async () => {
+                    await Promise.resolve();
+                    closed.push("promise");
+                });
+            });
+        };
+
+        await helper.load(nodes, [{ id: "close", type: "close-node", wires: [] }]);
+        await helper.unload();
+        assert.deepStrictEqual(closed.sort(), ["callback", "promise", "removed", "sync"]);
+    });
+
     test('rejects circular config node references', async function () {
         let constructed = 0;
         const nodes = (RED) => {

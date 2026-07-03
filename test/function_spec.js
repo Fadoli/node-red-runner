@@ -141,7 +141,7 @@ describe('function node', function () {
         });
     });
 
-    test.skip('should send to multiple messages', function (t,done) {
+    test('should send to multiple messages', function (t,done) {
         var flow = [{
             id: "n1", type: "function", wires: [["n2"]],
             func: "return [[{payload: 1},{payload: 2}]];"
@@ -183,7 +183,7 @@ describe('function node', function () {
         });
     });
 
-    test.skip('should handle null amongst valid messages', function (t,done) {
+    test('should handle null amongst valid messages', function (t,done) {
         var flow = [{ id: "n1", type: "function", wires: [["n2"]], func: "return [[msg,null,msg],null]" },
         { id: "n2", type: "helper" },
         { id: "n3", type: "helper" }];

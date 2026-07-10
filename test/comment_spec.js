@@ -17,7 +17,7 @@ const helper = require("../index.js");
 const commentNode = require("./nodes/90-comment.js");
 
 describe('comment Node', function () {
-    beforeAll(() => helper.startServer());
+    beforeAll(() => helper.startServer(0));
     afterAll(() => helper.stopServer());
     // afterEach(() => helper.unload());
 

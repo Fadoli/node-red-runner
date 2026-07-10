@@ -4,7 +4,8 @@ const log = require('./utils/log');
 const registry = require('./registry');
 const context = require('./context');
 const crypto = require('crypto');
-const HyperExpress = require('hyper-express');
+const express = require('express');
+const http = require('http');
 
 const nrUtils = require('./utils/node-red');
 
@@ -68,9 +69,9 @@ const api = {
     settings: {}
 }
 
-const server = new HyperExpress.Server()
-api.httpAdmin = api.httpNode = server;
-let isServerOpen = false;
+const app = express();
+api.httpAdmin = api.httpNode = app;
+let server;
 
 function findConfigReferences(value, configIds, references, referenced) {
     if (typeof value === 'string') {
@@ -190,7 +191,7 @@ const output = {
         }
         const ids = {};
         flows.forEach((config) => {
-            if (!registry.knownTypes[config.type]) {
+            if (!registry.getType(config.type)) {
                 throw new Error("Unknown node type : " + config.type);
             }
             if (ids[config.id]) {
@@ -204,12 +205,16 @@ const output = {
         // Register every node first so getNode always resolves, then initialise dependencies first.
         flows.forEach((config) => {
             const node = registry.flow[config.id] = new Node(config);
-            node.credentials = credentials[config.id];
+            const definition = registry.getType(config.type).options.credentials || {};
+            const supplied = credentials[config.id] || {};
+            node.credentials = Object.fromEntries(Object.keys(definition)
+                .filter((name) => supplied[name] !== undefined)
+                .map((name) => [name, supplied[name]]));
         });
         for (const phase of phases) {
             const pending = [];
             phase.forEach((config) => {
-                const result = registry.knownTypes[config.type].call(registry.flow[config.id], config);
+                const result = registry.getType(config.type).constructor.call(registry.flow[config.id], config);
                 if (result && typeof result.then === 'function') {
                     pending.push(result);
                 }
@@ -249,23 +254,31 @@ const output = {
      * @return {Promise<>} 
      */
     startServer(port = 1888) {
-        if (isServerOpen) {
+        if (server) {
             return Promise.resolve();
         }
-        isServerOpen = true;
-        return server.listen(port);
+        return new Promise((resolve, reject) => {
+            server = http.createServer(app);
+            server.once('error', (err) => {
+                server = undefined;
+                reject(err);
+            });
+            server.listen(port, resolve);
+        });
     },
     /**
      * @description Stops the web server
      * @return {Promise<>} 
      */
     stopServer() {
-        if (!isServerOpen) {
+        if (!server) {
             return Promise.resolve();
         }
-        isServerOpen = false;
-        server.close()
-        return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const activeServer = server;
+            server = undefined;
+            activeServer.close((err) => err ? reject(err) : resolve());
+        });
     },
     settings(newSettings) {
         api.settings = newSettings || {};

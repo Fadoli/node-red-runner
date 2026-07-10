@@ -20,11 +20,11 @@ describe('helper spec', function () {
     afterEach(() => helper.unload());
 
     test('Multi start/stop', async function () {
-        await helper.startServer();
+        await helper.startServer(0);
         await helper.stopServer();
         await helper.stopServer();
-        await helper.startServer();
-        await helper.startServer();
+        await helper.startServer(0);
+        await helper.startServer(0);
         await helper.stopServer();
     });
 
@@ -146,6 +146,56 @@ describe('helper spec', function () {
         node.error = (err, msg) => errors.push([err.message, msg.payload]);
         await node.receive({ payload: "failed" });
         assert.deepStrictEqual(errors, [["failed", "failed"]]);
+    });
+
+    test('exposes declared credentials only', async function () {
+        const nodes = (RED) => RED.nodes.registerType('secured', function () {}, {
+            credentials: { username: { type: 'text' }, password: { type: 'password' } },
+        });
+        await helper.load(nodes, [{ id: 'secured', type: 'secured', wires: [] }], {
+            secured: { username: 'alice', password: 'secret', ignored: 'nope' },
+        });
+        assert.deepStrictEqual(helper.getNode('secured').credentials, { username: 'alice', password: 'secret' });
+    });
+
+    test('routes done errors to scoped catch nodes', async function () {
+        const nodes = (RED) => RED.nodes.registerType('source', function () {
+            this.on('input', (msg, send, done) => done(new Error('broken')));
+        });
+        const flow = [
+            { id: 'source', z: 'flow', type: 'source', wires: [] },
+            { id: 'catch', z: 'flow', type: 'catch', scope: ['source'], wires: [] },
+        ];
+        await helper.load(nodes, flow);
+        const caught = helper.awaitNodeInput('catch');
+        helper.getNode('source').receive({ payload: 42 });
+        const msg = await caught;
+        assert.strictEqual(msg.payload, 42);
+        assert.strictEqual(msg.error.message, 'broken');
+        assert.strictEqual(msg.error.source.id, 'source');
+    });
+
+    test('routes successful done calls to scoped complete nodes once', async function () {
+        const nodes = (RED) => RED.nodes.registerType('source', function () {
+            this.on('input', (msg, send, done) => { done(); done(); });
+        });
+        const flow = [
+            { id: 'source', z: 'flow', type: 'source', wires: [] },
+            { id: 'complete', z: 'flow', type: 'complete', scope: ['source'], wires: [] },
+        ];
+        await helper.load(nodes, flow);
+        let count = 0;
+        helper.getNode('complete').on('input', () => count++);
+        helper.getNode('source').receive({ payload: 42 });
+        assert.strictEqual(count, 1);
+    });
+
+    test('provides an Express-compatible HTTP application', async function () {
+        const nodes = (RED) => RED.nodes.registerType('http-user', function () {
+            assert.strictEqual(typeof RED.httpNode.use, 'function');
+            assert.strictEqual(typeof RED.httpNode.get, 'function');
+        });
+        await helper.load(nodes, [{ id: 'http', type: 'http-user', wires: [] }]);
     });
 
     test('waits for every close handler style', async function () {

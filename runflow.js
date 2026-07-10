@@ -1,72 +1,101 @@
-console.time("startup time");
-const fs = require("fs");
-const path = require("path");
-const helper = require("./index.js");
-const NodeReader = require("./src/nodeReader");
+#!/usr/bin/env node
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const helper = require('./index');
+const NodeReader = require('./src/nodeReader');
 
+const usage = `Usage: node runflow.js [options]
 
-const dirToLoad = "~/.node-red"
+  --user-dir <dir>       Node-RED user directory (default: ~/.node-red)
+  --flow <file>          Flow JSON file (default: flows.json in user-dir)
+  --credentials <file>   Credentials JSON file (default: <flow>_cred.json)
+  --settings <file>      Settings JS or JSON file (default: settings.js in user-dir)
+  --port <number>        HTTP port (default: 1880)
+  --help                 Show this help
+`;
 
-const mainpackage = require(path.join(dirToLoad, "package.json"));
-const flow = require(path.join(dirToLoad, "flows_PC-Franck.json"));
-
-const { execSync } = require("child_process");
-
-async function baseNodeImporter() {
-    let output = [];
-    try {
-        const nodeRedDirectory = path.resolve(execSync('npm ls -g node-red').toString().trim().split('\n')[0].trim());
-        const nodesDirectory = path.join(nodeRedDirectory, 'node_modules/node-red/node_modules/@node-red/nodes/core');
-        const nodesDirectoryContent = (await fs.promises.readdir(nodesDirectory)).map((subDir => {
-            return fs.promises.readdir(path.join(nodesDirectory, subDir))
-                .then((files) => {
-                    files.forEach((fileName) => {
-                        if (fileName.endsWith('.js')) {
-                            output.push(path.join(nodesDirectory, subDir, fileName))
-                        }
-                    })
-                })
-        }));
-        await Promise.all(nodesDirectoryContent);
-    } catch (err) {
-        console.error("Failed at locating node-red nodes !");
+function parseArgs(args) {
+    const options = {};
+    for (let i = 0; i < args.length; i++) {
+        const name = args[i];
+        if (name === '--help') return { help: true };
+        if (!name.startsWith('--') || args[i + 1] === undefined) throw new Error(`Invalid option: ${name}`);
+        options[name.slice(2)] = args[++i];
     }
-    return output;
+    return options;
 }
 
-async function run() {
-    const nodes = [];
+function readOptional(file, fallback) {
+    return file && fs.existsSync(file) ? require(file) : fallback;
+}
 
-    const cleanedFlow = helper.clearFlow(flow);
-    const importer = new NodeReader(path.join(dirToLoad, "node_modules"), true);
-    const promises = [];
-    importer.registerFlows(cleanedFlow);
-    promises.push(baseNodeImporter().then((baseFiles) => {
-    baseFiles.forEach((file => {
-            nodes.push(importer.importFile(file));
-        }))
-    }))
-    Object.keys(mainpackage.dependencies).map(dep => {
-        nodes.push(...importer.importModule(dep));
-    });
-    await Promise.all(promises);
-    // importer.reportNotLoadedNodes();
-    await helper.load(nodes, flow);
-    await helper.startServer();
-    console.timeEnd("startup time");
+function decryptCredentials(credentials, secret) {
+    if (!credentials.$) return credentials;
+    if (!secret) throw new Error('Encrypted credentials require credentialSecret in settings');
+    const value = credentials.$;
+    const decipher = crypto.createDecipheriv(
+        'aes-256-ctr',
+        crypto.createHash('sha256').update(secret).digest(),
+        Buffer.from(value.slice(0, 32), 'hex'),
+    );
+    return JSON.parse(decipher.update(value.slice(32), 'base64', 'utf8') + decipher.final('utf8'));
+}
 
-    async function stop() {
+function importCoreNodes(reader) {
+    try {
+        const core = path.join(path.dirname(require.resolve('@node-red/nodes/package.json')), 'core');
+        return fs.readdirSync(core, { recursive: true })
+            .filter((file) => file.endsWith('.js'))
+            .map((file) => reader.importFile(path.join(core, file)));
+    } catch (err) {
+        if (err.code === 'MODULE_NOT_FOUND') return [];
+        throw err;
+    }
+}
+
+async function main(argv = process.argv.slice(2)) {
+    const options = parseArgs(argv);
+    if (options.help) {
+        console.log(usage);
+        return;
+    }
+
+    const userDir = path.resolve(options['user-dir'] || path.join(require('os').homedir(), '.node-red'));
+    const flowFile = path.resolve(options.flow || path.join(userDir, 'flows.json'));
+    const credentialFile = path.resolve(options.credentials || flowFile.replace(/\.json$/, '_cred.json'));
+    const settingsFile = path.resolve(options.settings || path.join(userDir, 'settings.js'));
+    const settings = readOptional(settingsFile, {});
+    const runtimeConfig = readOptional(path.join(userDir, '.config.runtime.json'), {});
+    const flow = require(flowFile);
+    const credentials = decryptCredentials(
+        readOptional(credentialFile, {}),
+        settings.credentialSecret || settings._credentialSecret || runtimeConfig._credentialSecret,
+    );
+    const reader = new NodeReader(path.join(userDir, 'node_modules'), true);
+    reader.registerFlows(helper.clearFlow(flow));
+
+    const nodes = importCoreNodes(reader);
+    const userPackage = readOptional(path.join(userDir, 'package.json'), { dependencies: {} });
+    Object.keys(userPackage.dependencies || {}).forEach((dependency) => nodes.push(...reader.importModule(dependency)));
+
+    helper.settings(settings);
+    await helper.load(nodes, flow, credentials);
+    await helper.startServer(Number(options.port || 1880));
+
+    const stop = async () => {
         await helper.unload();
         await helper.stopServer();
-        process.exit(0);
-    }
-    
-    process.on("SIGABRT", stop);
-    process.on("SIGBUS", stop);
-    process.on("SIGBREAK", stop);
-    process.on("SIGINT", stop);
-    process.on("SIGABRT", stop);
-    process.on("SIGABRT", stop);
+    };
+    process.once('SIGINT', stop);
+    process.once('SIGTERM', stop);
 }
 
-run();
+if (require.main === module) {
+    main().catch((err) => {
+        console.error(err);
+        process.exitCode = 1;
+    });
+}
+
+module.exports = { decryptCredentials, main, parseArgs, usage };

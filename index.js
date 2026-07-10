@@ -50,9 +50,13 @@ function clearFlow(flow) {
 }
 
 module.exports = {
-    startServer: async (cb) => {
+    startServer: async (port = 1888, cb) => {
+        if (port instanceof Function) {
+            cb = port;
+            port = 1888;
+        }
         try {
-            await runtime.startServer();
+            await runtime.startServer(port);
             if (cb) {
                 cb();
             }
@@ -99,6 +103,8 @@ module.exports = {
                 RED.nodes.registerType("helper", () => { });
                 RED.nodes.registerType("debug", () => { });
                 RED.nodes.registerType("comment", () => { });
+                RED.nodes.registerType("catch", () => { });
+                RED.nodes.registerType("complete", () => { });
             }));
 
             // Import other nodes

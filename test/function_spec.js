@@ -25,7 +25,7 @@ const functionNode = require("./nodes/80-function.js");
 describe('function node', function () {
 
     beforeAll(function () {
-        return helper.startServer();
+        return helper.startServer(0);
     });
 
     afterAll(function () {

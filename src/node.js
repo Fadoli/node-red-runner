@@ -40,6 +40,7 @@ class Node {
         this.name = config.name;
         this.alias = config._alias;
         this.wires = config.wires;
+        this.scope = config.scope;
 
         this.listeners = {};
         this.displayName = this.alias || this.name || this.id;
@@ -96,8 +97,19 @@ class Node {
         return this._context;
     }
 
-    error(str, ...options) {
-        log.error(`[NODE-${this.displayName}] ${str}`, ...options);
+    error(str, msg) {
+        const handled = msg && registry.getEventNodes('catch', this).length;
+        if (handled) {
+            registry.getEventNodes('catch', this).forEach((node) => node.receive({
+                ...clone(msg),
+                error: {
+                    message: str instanceof Error ? str.message : String(str),
+                    source: { id: this.id, type: this.type, name: this.name },
+                },
+            }));
+            return;
+        }
+        log.error(`[NODE-${this.displayName}] ${str}`, msg);
     }
     warn(str, ...options) {
         log.warn(`[NODE-${this.displayName}] ${str}`, ...options);
@@ -171,9 +183,14 @@ class Node {
 
     receive(msg) {
         const listeners = this.listeners.input || [];
+        let completed = false;
         const done = (err) => {
+            if (completed) return;
+            completed = true;
             if (err) {
                 this.error(err, msg);
+            } else {
+                registry.getEventNodes('complete', this).forEach((node) => node.receive(clone(msg)));
             }
         };
         listeners.forEach((listener) => {

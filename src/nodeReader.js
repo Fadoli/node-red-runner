@@ -2,40 +2,18 @@
 // Here we want to store global data
 const path = require('path');
 const fs = require('fs');
-const fsProm = require('fs').promises;
 const log = require('./utils/log');
 
 class NodeReader {
 
     constructor(moduleDirectory = './node_modules/', dynamicImport = false) {
-        this.dynamicImport = dynamicImport;
-        this.notImported = {};
         this.moduleDirectory = moduleDirectory;
-        this.usedInFlows = undefined;
+        this.dynamicImport = dynamicImport;
+        this.usedInFlows = new Set();
     }
 
-    /**
-     * @description
-     * @param {Array<node>} flows
-     * @memberof NodeReader
-     */
     registerFlows(flows) {
-        if (!this.dynamicImport) {
-            log.warn("Use dynamicImport in constructor to enable the 'registerFlows' feature")
-            return;
-        }
-        this.usedInFlows = {};
-        flows.forEach(node => {
-            this.usedInFlows[node.type] = true;
-        })
-    }
-
-    reportNotLoadedNodes() {
-        if (!this.dynamicImport) {
-            log.warn("Use dynamicImport in constructor to enable the 'reportNotLoadedNodes' feature")
-            return;
-        }
-        log.info("List of non imported nodes :\n" + JSON.stringify(this.notImported,null,4))
+        this.usedInFlows = new Set(flows.map(({ type }) => type));
     }
 
     /**
@@ -45,32 +23,18 @@ class NodeReader {
      */
     importFile(filePath) {
         if (this.dynamicImport) {
-            if (!this.usedInFlows) {
-                throw new Error("When using dynamicImport, please registerFlows before importing nodes")
-            }
-            const raw = fs.readFileSync(filePath, 'utf8');
-            const prefix = 'nodes.registerType(';
-            const suffix = ',';
+            const source = fs.readFileSync(filePath, 'utf8');
+            const calls = source.match(/registerType\s*\(/g) || [];
+            const literalTypes = [...source.matchAll(/registerType\s*\(\s*(['"`])([^'"`]+)\1/g)]
+                .map((match) => match[2]);
 
-            let containsFileToLoad = false;
-            let nodes = [];
-            raw.split(prefix).forEach((shard, index) => {
-                if (index === 0 || containsFileToLoad) {
-                    return;
-                }
-                const trimed = shard.split(suffix)[0].trim();
-                const node = trimed.substring(1, trimed.length - 1);
-                if (this.usedInFlows[node]) {
-                    containsFileToLoad = true;
-                }
-                nodes.push(node);
-            })
-            if (!containsFileToLoad) {
-                nodes.forEach((node) => this.notImported[node] = true)
+            // Only skip when parsing is conclusive; aliases and generated calls must load.
+            if (calls.length === literalTypes.length &&
+                literalTypes.length > 0 &&
+                !literalTypes.some((type) => this.usedInFlows.has(type))) {
                 return () => {};
             }
         }
-
         return require(filePath);
     }
 

@@ -63,6 +63,16 @@ function constructorName(obj) {
     return obj?.constructor?.name || '';
 }
 
+function mapToObject(map, limit) {
+    const result = {};
+    let count = 0;
+    for (const entry of map) {
+        if (count++ >= limit) break;
+        result[entry[0]] = entry[1];
+    }
+    return result;
+}
+
 /**
  * Converts the provided argument to a String, using type-dependent
  * methods.
@@ -159,9 +169,15 @@ function compareObjects(obj1,obj2) {
     if (typeof obj1 !== 'object' || typeof obj2 !== 'object') {
         return false;
     }
-    var keys1 = Object.keys(obj1);
-    var keys2 = Object.keys(obj2);
-    if (keys1.length != keys2.length) {
+    var count1 = 0;
+    var count2 = 0;
+    for (var key1 in obj1) {
+        if (hasOwnProperty.call(obj1, key1)) count1++;
+    }
+    for (var key2 in obj2) {
+        if (hasOwnProperty.call(obj2, key2)) count2++;
+    }
+    if (count1 !== count2) {
         return false;
     }
     for (var k in obj1) {
@@ -832,7 +848,7 @@ function encodeObject(msg,opts) {
                     msg.msg = {
                         __enc__: true,
                         type: "map",
-                        data: Object.fromEntries(Array.from(msg.msg.entries()).slice(0,debuglength)),
+                        data: mapToObject(msg.msg, debuglength),
                         length: msg.msg.size
                     }
                     needsStringify = true;
@@ -901,7 +917,7 @@ function encodeObject(msg,opts) {
                                 value = {
                                     __enc__: true,
                                     type: "map",
-                                    data: Object.fromEntries(Array.from(value.entries()).slice(0,debuglength)),
+                                    data: mapToObject(value, debuglength),
                                     length: value.size
                                 }
                             } else if (constructorName(value) === "RegExp") {

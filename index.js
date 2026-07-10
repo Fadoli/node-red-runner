@@ -1,6 +1,8 @@
 const runtime = require('./src/runtime');
 const registry = require('./src/registry');
 const request = require('supertest');
+const clone = require('./src/utils/node-red').cloneMessage;
+const expandSubflows = require('./src/subflow');
 
 // This will remove all non necessary nodes.
 /**
@@ -106,6 +108,19 @@ const helper = {
                 RED.nodes.registerType("comment", () => { });
                 RED.nodes.registerType("catch", () => { });
                 RED.nodes.registerType("complete", () => { });
+                RED.nodes.registerType('__subflow', function (config) {
+                    this.on('input', (msg) => config._targets.forEach((id, index) => {
+                        const target = registry.getNode(id);
+                        if (target) target.receive(index === 0 ? msg : clone(msg));
+                    }));
+                });
+                RED.nodes.registerType('__subflow-output', function (config) {
+                    this.on('input', (msg) => {
+                        const messages = Array(config.output + 1).fill(null);
+                        messages[config.output] = msg;
+                        registry.getNode(config.parent).send(messages);
+                    });
+                });
             }));
 
             // Import other nodes
@@ -113,7 +128,7 @@ const helper = {
                 promises.push(runtime.register(element));
             });
             await Promise.all(promises);
-            const cleanedFlow = clearFlow(flow);
+            const cleanedFlow = clearFlow(expandSubflows(flow));
             await runtime.load(cleanedFlow, creds);
 
             if (cb) {
@@ -148,7 +163,7 @@ const helper = {
         }
         try {
             await runtime.stop();
-            await runtime.load(clearFlow(flows.flows || flows), creds || flows.credentials);
+            await runtime.load(clearFlow(expandSubflows(flows.flows || flows)), creds || flows.credentials);
             if (cb) cb();
         } catch (error) {
             if (cb) cb(error);
@@ -190,7 +205,8 @@ const helper = {
         return address && `http://127.0.0.1:${address.port}`;
     },
     log: () => runtime.getLog(),
-    clearFlow: clearFlow
+    clearFlow: clearFlow,
+    expandSubflows
 };
 
 // ponytail: runtime state is process-global; split it per instance if parallel helpers are needed.

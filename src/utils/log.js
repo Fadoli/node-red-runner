@@ -19,8 +19,7 @@ const levelsEntries = {
 Object.freeze(levelsEntries);
 
 const logApi = {};
-const keys = Object.keys(levels);
-for (const key of keys) {
+for (const key in levels) {
     logApi[key] = (...data) => log(key, ...data);
 }
 function log(level, ...data) {

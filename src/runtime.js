@@ -206,10 +206,11 @@ const output = {
         flows.forEach((config) => {
             const node = registry.flow[config.id] = new Node(config);
             const definition = registry.getType(config.type).options.credentials || {};
-            const supplied = credentials[config.id] || {};
-            node.credentials = Object.fromEntries(Object.keys(definition)
-                .filter((name) => supplied[name] !== undefined)
-                .map((name) => [name, supplied[name]]));
+            const supplied = credentials[config._credentialId || config.id] || {};
+            node.credentials = {};
+            for (const name in definition) {
+                if (supplied[name] !== undefined) node.credentials[name] = supplied[name];
+            }
         });
         for (const phase of phases) {
             const pending = [];

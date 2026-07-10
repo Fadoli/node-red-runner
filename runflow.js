@@ -77,7 +77,9 @@ async function main(argv = process.argv.slice(2)) {
 
     const nodes = importCoreNodes(reader);
     const userPackage = readOptional(path.join(userDir, 'package.json'), { dependencies: {} });
-    Object.keys(userPackage.dependencies || {}).forEach((dependency) => nodes.push(...reader.importModule(dependency)));
+    for (const dependency in userPackage.dependencies || {}) {
+        nodes.push(...reader.importModule(dependency));
+    }
 
     helper.settings(settings);
     await helper.load(nodes, flow, credentials);

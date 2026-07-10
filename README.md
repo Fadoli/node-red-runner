@@ -45,6 +45,10 @@ The configured `file` acts as the storage root name. With the example above, the
 
 Files above `compressionThreshold` are automatically compressed with built-in zlib so no extra dependency is required.
 
+## License
+
+This project is available under AGPL-3.0-or-later. Commercial licensing is available from the copyright holder; see [LICENSE](LICENSE).
+
 ## Some numbers
 
 As of now (2024/02/23), a small flow with mostly only node-red nodes perform better in several metrics :

@@ -286,6 +286,15 @@ const output = {
     },
     getSettings() {
         return api.settings;
+    },
+    getApp() {
+        return app;
+    },
+    getServerAddress() {
+        return server && server.address();
+    },
+    getLog() {
+        return log;
     }
 }
 

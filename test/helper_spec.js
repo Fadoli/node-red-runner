@@ -21,6 +21,7 @@ describe('helper spec', function () {
 
     test('Multi start/stop', async function () {
         await helper.startServer(0);
+        assert.match(helper.url(), /^http:\/\/127\.0\.0\.1:\d+$/);
         await helper.stopServer();
         await helper.stopServer();
         await helper.startServer(0);
@@ -194,8 +195,24 @@ describe('helper spec', function () {
         const nodes = (RED) => RED.nodes.registerType('http-user', function () {
             assert.strictEqual(typeof RED.httpNode.use, 'function');
             assert.strictEqual(typeof RED.httpNode.get, 'function');
+            RED.httpNode.get('/compat-test', (req, res) => res.json({ ok: true }));
         });
         await helper.load(nodes, [{ id: 'http', type: 'http-user', wires: [] }]);
+        await helper.request().get('/compat-test').expect(200, { ok: true });
+    });
+
+    test('exposes node-red-test-helper compatibility methods', async function () {
+        assert.strictEqual(new helper.NodeTestHelper(), helper);
+        assert.strictEqual(typeof helper.clearFlows, 'function');
+        assert.strictEqual(typeof helper.log().info, 'function');
+        await new Promise((resolve, reject) => helper.unload((err) => err ? reject(err) : resolve()));
+    });
+
+    test('awaits arbitrary node events', async function () {
+        await helper.load(() => {}, [{ id: 'helper', type: 'helper', wires: [] }]);
+        const event = helper.awaitNodeEvent('helper', 'ready');
+        helper.getNode('helper').emit('ready', 42, 'ok');
+        assert.deepStrictEqual(await event, [42, 'ok']);
     });
 
     test('waits for every close handler style', async function () {

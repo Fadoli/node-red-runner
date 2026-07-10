@@ -1,5 +1,6 @@
 const runtime = require('./src/runtime');
 const registry = require('./src/registry');
+const request = require('supertest');
 
 // This will remove all non necessary nodes.
 /**
@@ -49,11 +50,11 @@ function clearFlow(flow) {
     return newFlow;
 }
 
-module.exports = {
-    startServer: async (port = 1888, cb) => {
+const helper = {
+    startServer: async (port = 0, cb) => {
         if (port instanceof Function) {
             cb = port;
-            port = 1888;
+            port = 0;
         }
         try {
             await runtime.startServer(port);
@@ -127,34 +128,72 @@ module.exports = {
             }
         }
     },
-    unload: async () => {
-        await runtime.clear();
+    unload: async (cb) => {
+        try {
+            await runtime.clear();
+            if (cb) cb();
+        } catch (error) {
+            if (cb) cb(error);
+            else throw error;
+        }
     },
-    setFlows: async (flows, creds) => {
-        await runtime.stop();
-        await runtime.load(flows, creds);
+    clearFlows: async () => runtime.stop(),
+    setFlows: async (flows, type, creds, cb) => {
+        if (typeof type !== 'string') {
+            cb = creds instanceof Function ? creds : undefined;
+            creds = type;
+        } else if (creds instanceof Function) {
+            cb = creds;
+            creds = undefined;
+        }
+        try {
+            await runtime.stop();
+            await runtime.load(clearFlow(flows.flows || flows), creds || flows.credentials);
+            if (cb) cb();
+        } catch (error) {
+            if (cb) cb(error);
+            else throw error;
+        }
     },
     settings: (newSettings) => {
         return runtime.settings(newSettings);
     },
     getNode: registry.getNode,
-    awaitNodeInput: async (node, delay = 500) => {
+    awaitNodeEvent: async (node, event, delay = 500) => {
         if (typeof node !== 'object') {
             node = registry.getNode(node);
         }
         if (!node) {
-            throw new Error('node does node exist !');
+            throw new Error('node does not exist');
         }
         return new Promise((res, rej) => {
             let rejectTimeout = setTimeout(() => {
-                rej(new Error('node did not recieve any message in the expected delay !'));
+                rej(new Error(`node did not emit ${event} within ${delay}ms`));
             }, delay)
-            node.once('input', (msg) => {
+            node.once(event, (...args) => {
                 clearTimeout(rejectTimeout);
-                res(msg);
+                res(args.length > 1 ? args : args[0]);
             })
         })
     },
-    init: () => { },
+    awaitNodeInput: async (node, delay = 500) => {
+        const value = await helper.awaitNodeEvent(node, 'input', delay);
+        return Array.isArray(value) ? value[0] : value;
+    },
+    init: (runtimePath, userSettings) => {
+        if (userSettings) runtime.settings(userSettings);
+        return helper;
+    },
+    request: () => request(runtime.getApp()),
+    url: () => {
+        const address = runtime.getServerAddress();
+        return address && `http://127.0.0.1:${address.port}`;
+    },
+    log: () => runtime.getLog(),
     clearFlow: clearFlow
-}
+};
+
+// ponytail: runtime state is process-global; split it per instance if parallel helpers are needed.
+helper.NodeTestHelper = function NodeTestHelper() { return helper; };
+
+module.exports = helper;

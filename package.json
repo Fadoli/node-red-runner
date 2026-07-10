@@ -12,7 +12,8 @@
         "fast-copy": "^4.0.2",
         "json-stringify-safe": "^5.0.1",
         "jsonata": "^2.0.3",
-        "moment-timezone": "^0.6.0"
+        "moment-timezone": "^0.6.0",
+        "supertest": "^7.1.4"
     },
     "main": "index.js",
     "bin": {

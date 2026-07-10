@@ -262,4 +262,39 @@ describe('helper spec', function () {
         await assert.rejects(helper.load(nodes, flow), /Circular config node references: first, second/);
         assert.strictEqual(constructed, 0);
     });
+
+    test('rolls back partially constructed flows after sync failure', async function () {
+        const closed = [];
+        const nodes = (RED) => {
+            RED.nodes.registerType('good', function () {
+                this.on('close', () => closed.push(this.id));
+            });
+            RED.nodes.registerType('bad', function () {
+                this.on('close', () => closed.push(this.id));
+                throw new Error('startup failed');
+            });
+        };
+        await assert.rejects(helper.load(nodes, [
+            { id: 'good', type: 'good', wires: [] },
+            { id: 'bad', type: 'bad', wires: [] },
+        ]), /startup failed/);
+        assert.deepStrictEqual(closed.sort(), ['bad', 'good']);
+        assert.strictEqual(helper.getNode('good'), undefined);
+    });
+
+    test('rolls back flows after async constructor rejection and allows retry', async function () {
+        let closed = false;
+        const nodes = (RED) => {
+            RED.nodes.registerType('async-bad', function () {
+                this.on('close', () => { closed = true; });
+                return Promise.reject(new Error('async startup failed'));
+            });
+            RED.nodes.registerType('good', function () {});
+        };
+        await assert.rejects(helper.load(nodes, [{ id: 'bad', type: 'async-bad', wires: [] }]), /async startup failed/);
+        assert.strictEqual(closed, true);
+        assert.strictEqual(helper.getNode('bad'), undefined);
+        await helper.load(nodes, [{ id: 'good', type: 'good', wires: [] }]);
+        assert.ok(helper.getNode('good'));
+    });
 });

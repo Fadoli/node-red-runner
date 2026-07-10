@@ -43,12 +43,26 @@ class Node {
         this.alias = config._alias;
         this.wires = config.wires;
         this.scope = config.scope;
+        this._env = config._env;
+        this._parentEnv = config._parentEnv;
+        this._parentFlowId = config._parentFlowId;
 
         this.listeners = {};
         this.displayName = this.alias || this.name || this.id;
 
-        this._context = context.getContext(this.id, this.z);
+        this._context = context.getContext(this.id, this.z, this._parentFlowId);
         this.context = () => this._context;
+    }
+
+    getSetting(name) {
+        if (name === 'NR_NODE_ID') return this.id;
+        if (name === 'NR_NODE_NAME') return this.name;
+        if (name === 'NR_NODE_PATH') return this.id;
+        if (name.startsWith('$parent.')) {
+            name = name.substring(8);
+            return this._parentEnv && this._parentEnv[name] !== undefined ? this._parentEnv[name] : process.env[name];
+        }
+        return this._env && this._env[name] !== undefined ? this._env[name] : process.env[name];
     }
 
     start() {

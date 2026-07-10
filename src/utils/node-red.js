@@ -25,6 +25,11 @@ const util = require("util");
 const { hasOwnProperty } = Object.prototype;
 const log = require("./log")
 
+
+function getSetting(node, name) {
+    return node && node.getSetting ? node.getSetting(name) : process.env[name];
+}
+
 /**
  * Safely clones a message object. This handles msg.req/msg.res objects that must
  * not be cloned.
@@ -1001,4 +1006,5 @@ module.exports = {
     prepareJSONataExpression: prepareJSONataExpression,
     evaluateJSONataExpression: evaluateJSONataExpression,
     parseContextStore: parseContextStore,
+    getSetting: getSetting,
 };

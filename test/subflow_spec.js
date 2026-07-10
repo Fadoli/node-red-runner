@@ -16,6 +16,14 @@ const nodes = (RED) => {
             { ...msg, payload: `${msg.payload}:1` },
         ]));
     });
+    RED.nodes.registerType('inspect-env', function () {
+        this.on('input', (msg) => {
+            msg.greeting = RED.util.getSetting(this, 'GREETING');
+            msg.fromParent = RED.util.evaluateNodeProperty('FROM_PARENT', 'env', this);
+            msg.parentContext = this.context().flow.get('$parent.shared');
+            this.send(msg);
+        });
+    });
 };
 
 test.afterEach(() => helper.unload());
@@ -64,4 +72,26 @@ test('executes nested subflows', async () => {
     const received = helper.awaitNodeInput('result');
     helper.getNode('instance').receive({ payload: 'nested' });
     assert.strictEqual((await received).payload, 'nested!');
+});
+
+test('applies subflow environment overrides and parent context', async () => {
+    const flow = [
+        { id: 'flow', type: 'tab', env: [{ name: 'PARENT', value: 'parent-env', type: 'str' }] },
+        { id: 'sf', type: 'subflow', env: [
+            { name: 'GREETING', value: 'default', type: 'str' },
+            { name: 'FROM_PARENT', value: 'PARENT', type: 'env' },
+        ], in: [{ wires: [{ id: 'inner' }] }], out: [{ wires: [{ id: 'inner', port: 0 }] }] },
+        { id: 'inner', z: 'sf', type: 'inspect-env', wires: [[]] },
+        { id: 'seed', z: 'flow', type: 'helper', wires: [] },
+        { id: 'instance', z: 'flow', type: 'subflow:sf', env: [{ name: 'GREETING', value: 'override', type: 'str' }], wires: [['result']] },
+        { id: 'result', z: 'flow', type: 'helper', wires: [] },
+    ];
+    await helper.load(nodes, flow);
+    helper.getNode('seed').context().flow.set('shared', 'parent-context');
+    const received = helper.awaitNodeInput('result');
+    helper.getNode('instance').receive({});
+    const msg = await received;
+    assert.strictEqual(msg.greeting, 'override');
+    assert.strictEqual(msg.fromParent, 'parent-env');
+    assert.strictEqual(msg.parentContext, 'parent-context');
 });

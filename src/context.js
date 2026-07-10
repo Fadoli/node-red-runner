@@ -350,7 +350,7 @@ function buildContextFor(id) {
     return ctx_build[id];
 }
 
-function getContext(nodeId, flowId) {
+function getContext(nodeId, flowId, parentFlowId) {
     ensureSafePathSegment(nodeId, 'node ID');
     if (flowId) {
         ensureSafePathSegment(flowId, 'flow ID');
@@ -365,9 +365,19 @@ function getContext(nodeId, flowId) {
         }
     }
 
+    let flowContext = buildContextFor(flowId);
+    if (parentFlowId) {
+        const own = flowContext;
+        const parent = buildContextFor(parentFlowId);
+        flowContext = {
+            get: (key) => key.startsWith('$parent.') ? parent.get(key.substring(8)) : own.get(key),
+            set: (key, value) => key.startsWith('$parent.') ? parent.set(key.substring(8), value) : own.set(key, value),
+            keys: own.keys,
+        };
+    }
     const output = {
         global: buildContextFor('global'),
-        flow: buildContextFor(flowId),
+        flow: flowContext,
         node: buildContextFor(nodeId),
     }
     output.keys = output.node.keys;
@@ -388,6 +398,7 @@ module.exports = {
         await saveNow();
     },
     clearContext: () => {
+        clearAutoSaveTimer();
         ctx = {};
         ctx_build = {};
         nodeFlowMap = {};

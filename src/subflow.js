@@ -11,17 +11,46 @@ function rewrite(value, ids) {
     return result;
 }
 
+function envValue(entry, current, parent) {
+    if (entry.type === 'num') return Number(entry.value);
+    if (entry.type === 'bool') return /^true$/i.test(entry.value);
+    if (entry.type === 'json') return JSON.parse(entry.value);
+    if (entry.type === 'env') {
+        if (current[entry.value] !== undefined) return current[entry.value];
+        if (parent && parent[entry.value] !== undefined) return parent[entry.value];
+        return process.env[entry.value];
+    }
+    return entry.value;
+}
+
+function buildEnv(templateEnv, instanceEnv, parent) {
+    const entries = {};
+    for (const entry of templateEnv || []) entries[entry.name] = entry;
+    for (const entry of instanceEnv || []) entries[entry.name] = entry;
+    const result = {};
+    for (const name in entries) {
+        if (entries[name].type !== 'env') result[name] = envValue(entries[name], result, parent);
+    }
+    for (const name in entries) {
+        if (entries[name].type === 'env') result[name] = envValue(entries[name], result, parent);
+    }
+    return result;
+}
+
 function expandSubflows(flow) {
     const templates = {};
     const children = {};
+    const flowEnv = {};
     for (const node of flow) {
         if (node.type === 'subflow') templates[node.id] = node;
+        else if (node.type === 'tab') flowEnv[node.id] = buildEnv(node.env);
     }
     for (const node of flow) {
         if (templates[node.z]) (children[node.z] ||= []).push(node);
     }
 
-    function instantiate(instance, template) {
+    function instantiate(instance, template, parentEnv) {
+        const env = buildEnv(template.env, instance.env, parentEnv);
         const templateChildren = children[template.id] || [];
         const ids = {};
         const configs = [];
@@ -31,8 +60,11 @@ function expandSubflows(flow) {
             for (const key in node) clone[key] = key === 'type' ? node[key] : rewrite(node[key], ids);
             clone.z = instance.id;
             clone._credentialId = node.id;
+            clone._env = env;
+            clone._parentEnv = parentEnv;
+            clone._parentFlowId = instance.z;
             const nested = node.type.startsWith('subflow:') && templates[node.type.slice(8)];
-            if (nested) configs.push(...instantiate(clone, nested));
+            if (nested) configs.push(...instantiate(clone, nested, env));
             else configs.push(clone);
         }
 
@@ -45,6 +77,9 @@ function expandSubflows(flow) {
         for (const key in instance) wrapper[key] = instance[key];
         wrapper.type = '__subflow';
         wrapper._targets = targets;
+        wrapper._env = env;
+        wrapper._parentEnv = parentEnv;
+        wrapper._parentFlowId = instance.z;
         const result = [wrapper, ...configs];
 
         const outputs = template.out || [];
@@ -78,7 +113,7 @@ function expandSubflows(flow) {
         }
         const template = templates[node.type.slice(8)];
         if (!template) throw new Error(`Unknown subflow: ${node.type}`);
-        result.push(...instantiate(node, template));
+        result.push(...instantiate(node, template, flowEnv[node.z]));
     }
     return result;
 }

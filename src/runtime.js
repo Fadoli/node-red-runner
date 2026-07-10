@@ -63,6 +63,7 @@ const api = {
         prepareJSONataExpression: nrUtils.prepareJSONataExpression,
         evaluateJSONataExpression: nrUtils.evaluateJSONataExpression,
         parseContextStore: nrUtils.parseContextStore,
+        getSetting: nrUtils.getSetting,
     },
     httpNode: undefined,
     httpAdmin: undefined,
@@ -204,31 +205,44 @@ const output = {
         const phases = buildLoadPhases(flows);
         await context.start(api.settings.contextStorage);
 
-        // Register every node first so getNode always resolves, then initialise dependencies first.
-        flows.forEach((config) => {
-            const node = registry.flow[config.id] = new Node(config);
-            const definition = registry.getType(config.type).options.credentials || {};
-            const supplied = credentials[config._credentialId || config.id] || {};
-            node.credentials = {};
-            for (const name in definition) {
-                if (supplied[name] !== undefined) node.credentials[name] = supplied[name];
-            }
-        });
-        for (const phase of phases) {
-            const pending = [];
-            phase.forEach((config) => {
-                const result = registry.getType(config.type).constructor.call(registry.flow[config.id], config);
-                if (result && typeof result.then === 'function') {
-                    pending.push(result);
+        try {
+            // Register every node first so getNode always resolves, then initialise dependencies first.
+            flows.forEach((config) => {
+                const node = registry.flow[config.id] = new Node(config);
+                const definition = registry.getType(config.type).options.credentials || {};
+                const supplied = credentials[config._credentialId || config.id] || {};
+                node.credentials = {};
+                for (const name in definition) {
+                    if (supplied[name] !== undefined) node.credentials[name] = supplied[name];
                 }
             });
-            if (pending.length) {
-                await Promise.all(pending);
+            for (const phase of phases) {
+                const pending = [];
+                phase.forEach((config) => {
+                    const result = registry.getType(config.type).constructor.call(registry.flow[config.id], config);
+                    if (result && typeof result.then === 'function') {
+                        pending.push(result);
+                    }
+                });
+                if (pending.length) {
+                    await Promise.all(pending);
+                }
             }
-        }
-        for (const id in registry.flow) {
-            const node = registry.getNode(id);
-            node.start();
+            for (const id in registry.flow) registry.getNode(id).start();
+        } catch (error) {
+            const pending = [];
+            for (const id in registry.flow) {
+                try {
+                    const result = registry.flow[id].close(true);
+                    if (result && typeof result.then === 'function') pending.push(result);
+                } catch (_) {
+                    // Preserve the startup error.
+                }
+            }
+            registry.cleanFlow();
+            if (pending.length) await Promise.allSettled(pending);
+            context.clearContext();
+            throw error;
         }
     },
     /**

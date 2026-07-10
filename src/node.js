@@ -2,6 +2,7 @@ const log = require("./utils/log");
 const clone = require("./utils/node-red").cloneMessage;
 const registry = require("./registry");
 const context = require('./context');
+const crypto = require('crypto');
 
 function NOOP () { }
 
@@ -9,6 +10,7 @@ function sendMessage(targets, msg) {
     if (msg === null || msg === undefined) {
         return;
     }
+    if (msg._msgid === undefined) msg._msgid = crypto.randomUUID();
     if (targets.length === 1) {
         targets[0].receive(msg);
     } else {

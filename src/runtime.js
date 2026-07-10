@@ -70,6 +70,8 @@ const api = {
 }
 
 const app = express();
+// Node-RED's HTTP nodes still use Express 4's private router name.
+Object.defineProperty(app, '_router', { get: () => app.router });
 api.httpAdmin = api.httpNode = app;
 let server;
 

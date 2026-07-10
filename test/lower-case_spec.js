@@ -76,11 +76,14 @@ describe('lower-case Node', async function () {
         expect(n1.name).toBe('lower-case');
         const n2 = helper.getNode("n2");
         let count = 0;
+        let msgid;
         return new Promise((res,rej) => { 
             n2.on('input', (msg) => {
                 try {
                     count++;
-                    expect(msg).toBe({ payload: "uppercase !" });
+                    expect(msg.payload).toBe("uppercase !");
+                    msgid = msgid || msg._msgid;
+                    expect(msg._msgid).toBe(msgid);
                     if (count === 2) {
                         res();
                     }

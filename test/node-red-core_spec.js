@@ -11,6 +11,11 @@ const inject = core('common/20-inject.js');
 const functionNode = core('function/10-function.js');
 const change = core('function/15-change.js');
 const http = core('network/21-httpin.js');
+const switchNode = core('function/10-switch.js');
+const template = core('function/80-template.js');
+const delay = core('function/89-delay.js');
+const json = core('parsers/70-JSON.js');
+const file = core('storage/10-file.js');
 
 test.afterEach(async () => {
     await helper.unload();
@@ -56,4 +61,35 @@ test('serves HTTP In through Function and HTTP Response', async () => {
     ];
     await helper.load([http, functionNode], flow);
     await helper.request().post('/compat').send({ value: 42 }).expect(201, { received: 42 });
+});
+
+test('runs optional Node-RED Template, JSON, Switch and Delay nodes', async () => {
+    const flow = [
+        { id: 'template', z: 'flow', type: 'template', field: 'payload', fieldType: 'msg', syntax: 'mustache', output: 'str', template: '{"value":"{{payload}}"}', wires: [['json']] },
+        { id: 'json', z: 'flow', type: 'json', property: 'payload', action: 'obj', wires: [['switch']] },
+        { id: 'switch', z: 'flow', type: 'switch', property: 'payload.value', propertyType: 'msg', checkall: 'true', rules: [{ t: 'eq', v: 'core', vt: 'str' }], wires: [['delay']] },
+        { id: 'delay', z: 'flow', type: 'delay', pauseType: 'delay', timeout: '1', timeoutUnits: 'milliseconds', rate: '1', rateUnits: 'second', randomFirst: '1', randomLast: '1', outputs: 1, wires: [['result']] },
+        { id: 'result', z: 'flow', type: 'helper', wires: [] },
+    ];
+    await helper.load([template, json, switchNode, delay], flow);
+    const result = helper.awaitNodeInput('result');
+    helper.getNode('template').receive({ payload: 'core' });
+    assert.deepStrictEqual((await result).payload, { value: 'core' });
+});
+
+test('runs optional Node-RED File write and read nodes', async () => {
+    const filename = path.join(__dirname, '.tmp-core-file.txt');
+    const flow = [
+        { id: 'write', z: 'flow', type: 'file', filename, filenameType: 'str', appendNewline: false, overwriteFile: true, createDir: true, encoding: 'utf8', wires: [['read']] },
+        { id: 'read', z: 'flow', type: 'file in', filename, filenameType: 'str', format: 'utf8', encoding: 'utf8', wires: [['result']] },
+        { id: 'result', z: 'flow', type: 'helper', wires: [] },
+    ];
+    try {
+        await helper.load(file, flow);
+        const result = helper.awaitNodeInput('result');
+        helper.getNode('write').receive({ payload: 'file-content' });
+        assert.strictEqual((await result).payload, 'file-content');
+    } finally {
+        await require('node:fs/promises').unlink(filename).catch(() => {});
+    }
 });

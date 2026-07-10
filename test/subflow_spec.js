@@ -20,6 +20,7 @@ const nodes = (RED) => {
         this.on('input', (msg) => {
             msg.greeting = RED.util.getSetting(this, 'GREETING');
             msg.fromParent = RED.util.evaluateNodeProperty('FROM_PARENT', 'env', this);
+            msg.secret = RED.util.getSetting(this, 'SECRET');
             msg.parentContext = this.context().flow.get('$parent.shared');
             this.send(msg);
         });
@@ -80,13 +81,14 @@ test('applies subflow environment overrides and parent context', async () => {
         { id: 'sf', type: 'subflow', env: [
             { name: 'GREETING', value: 'default', type: 'str' },
             { name: 'FROM_PARENT', value: 'PARENT', type: 'env' },
+            { name: 'SECRET', type: 'cred' },
         ], in: [{ wires: [{ id: 'inner' }] }], out: [{ wires: [{ id: 'inner', port: 0 }] }] },
         { id: 'inner', z: 'sf', type: 'inspect-env', wires: [[]] },
         { id: 'seed', z: 'flow', type: 'helper', wires: [] },
         { id: 'instance', z: 'flow', type: 'subflow:sf', env: [{ name: 'GREETING', value: 'override', type: 'str' }], wires: [['result']] },
         { id: 'result', z: 'flow', type: 'helper', wires: [] },
     ];
-    await helper.load(nodes, flow);
+    await helper.load(nodes, flow, { sf: { SECRET: 'template-secret' }, instance: { SECRET: 'instance-secret' } });
     helper.getNode('seed').context().flow.set('shared', 'parent-context');
     const received = helper.awaitNodeInput('result');
     helper.getNode('instance').receive({});
@@ -94,4 +96,5 @@ test('applies subflow environment overrides and parent context', async () => {
     assert.strictEqual(msg.greeting, 'override');
     assert.strictEqual(msg.fromParent, 'parent-env');
     assert.strictEqual(msg.parentContext, 'parent-context');
+    assert.strictEqual(msg.secret, 'instance-secret');
 });

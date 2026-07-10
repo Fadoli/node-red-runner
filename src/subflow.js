@@ -12,6 +12,7 @@ function rewrite(value, ids) {
 }
 
 function envValue(entry, current, parent) {
+    if (entry.type === 'cred') return { __subflowCredential: entry.name };
     if (entry.type === 'num') return Number(entry.value);
     if (entry.type === 'bool') return /^true$/i.test(entry.value);
     if (entry.type === 'json') return JSON.parse(entry.value);
@@ -63,6 +64,8 @@ function expandSubflows(flow) {
             clone._env = env;
             clone._parentEnv = parentEnv;
             clone._parentFlowId = instance.z;
+            clone._envCredentialInstance = instance._credentialId || instance.id;
+            clone._envCredentialTemplate = template.id;
             const nested = node.type.startsWith('subflow:') && templates[node.type.slice(8)];
             if (nested) configs.push(...instantiate(clone, nested, env));
             else configs.push(clone);
@@ -80,6 +83,8 @@ function expandSubflows(flow) {
         wrapper._env = env;
         wrapper._parentEnv = parentEnv;
         wrapper._parentFlowId = instance.z;
+        wrapper._envCredentialInstance = instance._credentialId || instance.id;
+        wrapper._envCredentialTemplate = template.id;
         const result = [wrapper, ...configs];
 
         const outputs = template.out || [];

@@ -164,6 +164,22 @@ function buildLoadPhases(flows) {
     return phases;
 }
 
+function resolveEnvironment(config, credentials) {
+    if (!config._env) return;
+    const instanceCredentials = credentials[config._envCredentialInstance] || {};
+    const templateCredentials = credentials[config._envCredentialTemplate] || {};
+    const env = {};
+    for (const name in config._env) {
+        const value = config._env[name];
+        if (value && value.__subflowCredential) {
+            env[name] = instanceCredentials[name] !== undefined ? instanceCredentials[name] : templateCredentials[name];
+        } else {
+            env[name] = value;
+        }
+    }
+    config._env = env;
+}
+
 const output = {
     /**
      * @description Import a module !
@@ -208,6 +224,7 @@ const output = {
         try {
             // Register every node first so getNode always resolves, then initialise dependencies first.
             flows.forEach((config) => {
+                resolveEnvironment(config, credentials);
                 const node = registry.flow[config.id] = new Node(config);
                 const definition = registry.getType(config.type).options.credentials || {};
                 const supplied = credentials[config._credentialId || config.id] || {};

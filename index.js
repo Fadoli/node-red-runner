@@ -3,6 +3,7 @@ const registry = require('./src/registry');
 const request = require('supertest');
 const clone = require('./src/utils/node-red').cloneMessage;
 const expandSubflows = require('./src/subflow');
+const registerBuiltins = require('./src/builtins');
 
 // This will remove all non necessary nodes.
 /**
@@ -106,8 +107,7 @@ const helper = {
                 RED.nodes.registerType("helper", () => { });
                 RED.nodes.registerType("debug", () => { });
                 RED.nodes.registerType("comment", () => { });
-                RED.nodes.registerType("catch", () => { });
-                RED.nodes.registerType("complete", () => { });
+                registerBuiltins(RED, registry, clone);
                 RED.nodes.registerType('__subflow', function (config) {
                     this.on('input', (msg) => config._targets.forEach((id, index) => {
                         const target = registry.getNode(id);

@@ -140,7 +140,15 @@ class Node {
         log.trace(`[NODE-${this.displayName}] ${str}`, ...options);
     }
     metric() { }
-    status() { }
+    status(status) {
+        const nodes = registry.getEventNodes('status', this);
+        for (const node of nodes) {
+            node.receive({ status: {
+                ...status,
+                source: { id: this.id, type: this.type, name: this.name },
+            }});
+        }
+    }
 
     /**
      * Register an event listener

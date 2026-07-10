@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 
+// Routing nodes live here because they coordinate runtime nodes rather than perform
+// user work. Keeping them on Node.receive/send preserves normal cloning and errors.
 module.exports = function registerBuiltins(RED, registry, clone) {
     function passThrough() {
         this.on('input', (msg) => this.send(msg));
@@ -28,6 +30,7 @@ module.exports = function registerBuiltins(RED, registry, clone) {
         });
     });
     RED.nodes.registerType('link call', function (config) {
+        // Each in-flight call retains the original send/done pair until a Link Return.
         const pending = {};
         const timeout = Number(config.timeout || 30) * 1000;
         this.on('input', (msg, send, done) => {

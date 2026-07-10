@@ -367,6 +367,7 @@ function getContext(nodeId, flowId, parentFlowId) {
 
     let flowContext = buildContextFor(flowId);
     if (parentFlowId) {
+        // Subflow `$parent` addresses the immediate containing flow, not global context.
         const own = flowContext;
         const parent = buildContextFor(parentFlowId);
         flowContext = {

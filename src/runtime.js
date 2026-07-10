@@ -168,6 +168,7 @@ function resolveEnvironment(config, credentials) {
     if (!config._env) return;
     const instanceCredentials = credentials[config._envCredentialInstance] || {};
     const templateCredentials = credentials[config._envCredentialTemplate] || {};
+    // Expansion leaves credential markers because credentials are only available here.
     const env = {};
     for (const name in config._env) {
         const value = config._env[name];
@@ -247,6 +248,7 @@ const output = {
             }
             for (const id in registry.flow) registry.getNode(id).start();
         } catch (error) {
+            // Loading is transactional: close everything created so a retry starts clean.
             const pending = [];
             for (const id in registry.flow) {
                 try {

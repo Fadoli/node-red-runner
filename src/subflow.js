@@ -1,3 +1,5 @@
+// Subflows are compiled into ordinary configs. This keeps the runtime unaware of
+// templates and makes nested subflows use the same lifecycle as top-level nodes.
 function rewrite(value, ids) {
     if (typeof value === 'string') return ids[value] || value;
     if (Array.isArray(value)) {
@@ -29,6 +31,7 @@ function buildEnv(templateEnv, instanceEnv, parent) {
     for (const entry of templateEnv || []) entries[entry.name] = entry;
     for (const entry of instanceEnv || []) entries[entry.name] = entry;
     const result = {};
+    // Resolve direct values first so `env` entries can reference sibling values.
     for (const name in entries) {
         if (entries[name].type !== 'env') result[name] = envValue(entries[name], result, parent);
     }
@@ -55,6 +58,7 @@ function expandSubflows(flow) {
         const templateChildren = children[template.id] || [];
         const ids = {};
         const configs = [];
+        // Prefixing IDs isolates context, config references, and nested instances.
         for (const node of templateChildren) ids[node.id] = `${instance.id}:${node.id}`;
         for (const node of templateChildren) {
             const clone = {};
@@ -87,6 +91,7 @@ function expandSubflows(flow) {
         wrapper._envCredentialTemplate = template.id;
         const result = [wrapper, ...configs];
 
+        // Output proxies turn an internal output into the matching wrapper output.
         const outputs = template.out || [];
         for (let index = 0; index < outputs.length; index++) {
             const proxyId = `${instance.id}:out:${index}`;

@@ -1,0 +1,5 @@
+[
+  { "id": "flow", "type": "tab", "label": "benchmark" },
+  { "id": "source", "z": "flow", "type": "benchmark-source", "wires": [["sink"]] },
+  { "id": "sink", "z": "flow", "type": "benchmark-sink", "wires": [] }
+]

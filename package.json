@@ -3,7 +3,8 @@
     "version": "1.0.0",
     "description": "Provides an other lighter implementation of node-red runtime and test-helper",
     "scripts": {
-        "test": "node --experimental-test-coverage --test-coverage-exclude=**/node_modules/** --test-coverage-exclude=**/node-reader-*/** --test --test-reporter=spec",
+        "test": "node --experimental-test-coverage --test-coverage-exclude=**/node_modules/** --test-coverage-exclude=**/node-reader-*/** --test-coverage-exclude=**/cli-node-*/** --test --test-reporter=spec",
+        "bench": "node bench/measure.js",
         "start": "node ./runflow.js",
         "start:prof": "node --prof ./runflow.js"
     },

@@ -49,10 +49,6 @@ Files above `compressionThreshold` are automatically compressed with built-in zl
 
 This project is available under AGPL-3.0-or-later. Commercial licensing is available from the copyright holder; see [LICENSE](LICENSE).
 
-## Some numbers
+## Benchmarks
 
-As of now (2024/02/23), a small flow with mostly only node-red nodes perform better in several metrics :
-
-1. Startup time is slightly improved
-1. Memory consumption is improved in the case of small flows (NR uses around ~50-75MB whereas this use only ~25-30MB)
-1. CPU usage overhead is reduced as well due to the simplification of the runtime
+The runner aims to reduce startup time, memory consumption, and CPU overhead for small flows. Historical measurements are not treated as current claims: the reproducible [benchmark harness](bench/README.md) compares the runner against Node-RED using the same Inject flow.

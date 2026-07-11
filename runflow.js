@@ -54,7 +54,10 @@ function importCoreNodes(reader) {
     }
 }
 
-async function main(argv = process.argv.slice(2)) {
+async function main(argv = process.argv.slice(2), dependencies = {}) {
+    const runtime = dependencies.helper || helper;
+    const Reader = dependencies.NodeReader || NodeReader;
+    const loadCoreNodes = dependencies.importCoreNodes || importCoreNodes;
     const options = parseArgs(argv);
     if (options.help) {
         console.log(usage);
@@ -72,22 +75,22 @@ async function main(argv = process.argv.slice(2)) {
         readOptional(credentialFile, {}),
         settings.credentialSecret || settings._credentialSecret || runtimeConfig._credentialSecret,
     );
-    const reader = new NodeReader(path.join(userDir, 'node_modules'), true);
-    reader.registerFlows(helper.clearFlow(flow));
+    const reader = new Reader(path.join(userDir, 'node_modules'), true);
+    reader.registerFlows(runtime.clearFlow(flow));
 
-    const nodes = importCoreNodes(reader);
+    const nodes = loadCoreNodes(reader);
     const userPackage = readOptional(path.join(userDir, 'package.json'), { dependencies: {} });
     for (const dependency in userPackage.dependencies || {}) {
         nodes.push(...reader.importModule(dependency));
     }
 
-    helper.settings(settings);
-    await helper.load(nodes, flow, credentials);
-    await helper.startServer(Number(options.port || 1880));
+    runtime.settings(settings);
+    await runtime.load(nodes, flow, credentials);
+    await runtime.startServer(Number(options.port || 1880));
 
     const stop = async () => {
-        await helper.unload();
-        await helper.stopServer();
+        await runtime.unload();
+        await runtime.stopServer();
     };
     process.once('SIGINT', stop);
     process.once('SIGTERM', stop);

@@ -3,17 +3,19 @@
     "version": "1.0.0",
     "description": "Provides an other lighter implementation of node-red runtime and test-helper",
     "scripts": {
-        "test": "node --experimental-test-coverage --test --test-reporter=spec",
+        "test": "node --experimental-test-coverage --test-coverage-exclude=**/node_modules/** --test-coverage-exclude=**/node-reader-*/** --test --test-reporter=spec",
         "start": "node ./runflow.js",
         "start:prof": "node --prof ./runflow.js"
     },
     "dependencies": {
         "express": "^5.1.0",
         "fast-copy": "^4.0.2",
-        "json-stringify-safe": "^5.0.1",
         "jsonata": "^2.0.3",
         "moment-timezone": "^0.6.0",
         "supertest": "^7.1.4"
+    },
+    "devDependencies": {
+        "node-red": "^5.0.1"
     },
     "main": "index.js",
     "bin": {
@@ -36,8 +38,5 @@
     "bugs": {
         "url": "https://github.com/Fadoli/node-red-runner/issues"
     },
-    "homepage": "https://github.com/Fadoli/node-red-runner#readme",
-    "optionalDependencies": {
-        "node-red": "^4.1.0"
-    }
+    "homepage": "https://github.com/Fadoli/node-red-runner#readme"
 }

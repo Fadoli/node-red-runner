@@ -41,6 +41,14 @@ const waitFor = (check, attempts = 30) => new Promise((resolve, reject) => {
     retry();
 });
 
+test('runner-flow falls back to the hostname flow file', async (t) => {
+    const userDir = await fs.mkdtemp(path.join(os.tmpdir(), 'runner-flow-'));
+    const flowFile = path.join(userDir, `flows_${os.hostname()}.json`);
+    await fs.writeFile(flowFile, '[]');
+    t.after(() => fs.rm(userDir, { recursive: true, force: true }));
+    assert.strictEqual(runnerFlow.resolveFlowFile({ userDir, flowFile: 'flows.json' }), flowFile);
+});
+
 test('runner-flow runs a disabled tab with isolated context', async (t) => {
     const userDir = await fs.mkdtemp(path.join(os.tmpdir(), 'runner-flow-'));
     const port = await getPort();

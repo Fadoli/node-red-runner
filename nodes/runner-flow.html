@@ -10,12 +10,26 @@ RED.nodes.registerType('runner-flow', {
         port: { value: 1881, required: true, validate: RED.validators.number() },
     },
     label: function () { return this.name || 'runner flow'; },
+    oneditprepare: function () {
+        const select = $('#node-input-flowId');
+        const selected = this.flowId;
+        select.empty().append($('<option>', { value: '', text: 'Select a disabled flow' }));
+        RED.nodes.eachWorkspace(function (node) {
+            if (node.type === 'tab' && node.disabled) {
+                select.append($('<option>', {
+                    value: node.id,
+                    text: `${node.label || 'Unnamed flow'} (${node.id})`,
+                }));
+            }
+        });
+        select.val(selected);
+    },
 });
 </script>
 
 <script type="text/x-red" data-template-name="runner-flow">
     <div class="form-row"><label for="node-input-name"><i class="fa fa-tag"></i> Name</label><input id="node-input-name"></div>
-    <div class="form-row"><label for="node-input-flowId"><i class="fa fa-sitemap"></i> Disabled flow ID</label><input id="node-input-flowId"></div>
+    <div class="form-row"><label for="node-input-flowId"><i class="fa fa-sitemap"></i> Disabled flow</label><select id="node-input-flowId"></select></div>
     <div class="form-row"><label for="node-input-port"><i class="fa fa-plug"></i> Port</label><input id="node-input-port" type="number" min="1" max="65535"></div>
 </script>
 

@@ -1,10 +1,13 @@
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 function resolveFlowFile(settings) {
     const userDir = settings.userDir || process.cwd();
-    return path.resolve(userDir, settings.flowFile || 'flows.json');
+    const configured = settings.flowFile && path.resolve(userDir, settings.flowFile);
+    const hostnameFlow = path.join(userDir, `flows_${os.hostname()}.json`);
+    return [configured, hostnameFlow, path.join(userDir, 'flows.json')].find((file) => file && fs.existsSync(file)) || hostnameFlow;
 }
 
 function runnerFlow(RED) {
@@ -60,3 +63,4 @@ function runnerFlow(RED) {
 }
 
 module.exports = runnerFlow;
+module.exports.resolveFlowFile = resolveFlowFile;

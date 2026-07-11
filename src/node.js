@@ -188,6 +188,9 @@ class Node {
      * @memberof Node
      */
     emit(eventName, ...params) {
+        if (eventName === 'input') {
+            return this.receive(...params);
+        }
         const listeners = this.listeners[eventName];
         const output = [];
         if (listeners) {
@@ -205,7 +208,7 @@ class Node {
         return output;
     }
 
-    receive(msg) {
+    receive(msg = {}, send = this.send, complete) {
         const listeners = this.listeners.input || [];
         let completed = false;
         const done = (err) => {
@@ -216,10 +219,11 @@ class Node {
             } else {
                 registry.getEventNodes('complete', this).forEach((node) => node.receive(clone(msg)));
             }
+            if (complete) complete(err);
         };
         listeners.forEach((listener) => {
             try {
-                const result = listener.call(this, msg, this.send, done);
+                const result = listener.call(this, msg, send, done);
                 if (result && typeof result.then === 'function') {
                     result.catch(done);
                 }

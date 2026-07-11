@@ -42,6 +42,15 @@ test('runs optional Node-RED inject, function and change nodes', async () => {
     assert.strictEqual((await completed).payload, 'core-function');
 });
 
+test('runs an Inject node scheduled with once', async () => {
+    const flow = [
+        { id: 'inject', z: 'flow', type: 'inject', props: [{ p: 'payload', v: 'once', vt: 'str' }], once: true, onceDelay: 0.01, wires: [['result']] },
+        { id: 'result', z: 'flow', type: 'helper', wires: [] },
+    ];
+    await helper.load(inject, flow);
+    assert.strictEqual((await helper.awaitNodeInput('result', 500)).payload, 'once');
+});
+
 test('routes errors from a Node-RED function node to Catch', async () => {
     const flow = [
         { id: 'function', z: 'flow', type: 'function', func: "throw new Error('core failure');", outputs: 1, wires: [] },

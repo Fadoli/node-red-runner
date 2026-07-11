@@ -1,0 +1,62 @@
+const { spawn } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+
+function resolveFlowFile(settings) {
+    const userDir = settings.userDir || process.cwd();
+    return path.resolve(userDir, settings.flowFile || 'flows.json');
+}
+
+function runnerFlow(RED) {
+    RED.nodes.registerType('runner-flow', function (config) {
+        RED.nodes.createNode(this, config);
+        const node = this;
+        const port = Number(config.port);
+        const flowFile = resolveFlowFile(RED.settings);
+        const flow = JSON.parse(fs.readFileSync(flowFile, 'utf8'));
+        const tab = flow.find((entry) => entry.type === 'tab' && entry.id === config.flowId);
+
+        if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('runner-flow requires a port between 1 and 65535');
+        if (!tab || !tab.disabled) throw new Error(`runner-flow requires a disabled flow tab: ${config.flowId}`);
+        if (!node.id || node.id !== path.basename(node.id)) throw new Error('runner-flow node ID must be a path segment');
+
+        const root = path.join(RED.settings.userDir || path.dirname(flowFile), '.node-red-runner', node.id);
+        const contextDir = path.join(root, 'context');
+        fs.mkdirSync(contextDir, { recursive: true });
+        node.status({ fill: 'blue', shape: 'ring', text: `starting on ${port}` });
+
+        let stderr = '';
+        const child = spawn(process.execPath, [
+            path.join(__dirname, '..', 'runflow.js'),
+            '--user-dir', RED.settings.userDir || path.dirname(flowFile),
+            '--flow', flowFile,
+            '--flow-id', config.flowId,
+            '--credentials', flowFile.replace(/\.json$/, '_cred.json'),
+            '--context-dir', contextDir,
+            '--metrics-interval', '1000',
+            '--port', String(port),
+        ], { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+
+        child.stderr.on('data', (data) => { stderr += data; });
+        child.on('message', (message) => {
+            if (message.type === 'metrics') node.send({ payload: message });
+        });
+        child.once('spawn', () => node.status({ fill: 'green', shape: 'dot', text: `listening on ${port}` }));
+        child.once('exit', (code, signal) => {
+            node.status({ fill: 'red', shape: 'ring', text: 'stopped' });
+            if (code && !node._closing) node.error(stderr || `runner exited with code ${code}${signal ? ` (${signal})` : ''}`);
+        });
+        node.on('close', (done) => {
+            node._closing = true;
+            if (child.exitCode !== null || child.signalCode !== null) return done();
+            const forceStop = setTimeout(() => child.kill('SIGKILL'), 1000);
+            child.once('exit', () => {
+                clearTimeout(forceStop);
+                done();
+            });
+            child.kill();
+        });
+    });
+}
+
+module.exports = runnerFlow;

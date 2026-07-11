@@ -1,0 +1,24 @@
+<script type="text/javascript">
+RED.nodes.registerType('runner-flow', {
+    category: 'function',
+    color: '#d8bfd8',
+    inputs: 0,
+    outputs: 1,
+    defaults: {
+        name: { value: '' },
+        flowId: { value: '', required: true },
+        port: { value: 1881, required: true, validate: RED.validators.number() },
+    },
+    label: function () { return this.name || 'runner flow'; },
+});
+</script>
+
+<script type="text/x-red" data-template-name="runner-flow">
+    <div class="form-row"><label for="node-input-name"><i class="fa fa-tag"></i> Name</label><input id="node-input-name"></div>
+    <div class="form-row"><label for="node-input-flowId"><i class="fa fa-sitemap"></i> Disabled flow ID</label><input id="node-input-flowId"></div>
+    <div class="form-row"><label for="node-input-port"><i class="fa fa-plug"></i> Port</label><input id="node-input-port" type="number" min="1" max="65535"></div>
+</script>
+
+<script type="text/x-red" data-help-name="runner-flow">
+    <p>Runs a disabled flow tab in an isolated process. Configure the tab ID and a dedicated HTTP port. Its output emits CPU and memory metrics every second.</p>
+</script>

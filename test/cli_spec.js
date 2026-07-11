@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { decryptCredentials, main, parseArgs } = require('../runflow');
+const { decryptCredentials, main, parseArgs, selectFlow } = require('../runflow');
 
 test('CLI parses runtime options', () => {
     assert.deepStrictEqual(parseArgs(['--flow', 'flow.json', '--port', '1888']), {
@@ -19,6 +19,18 @@ test('CLI decrypts Node-RED credential files', () => {
     const cipher = crypto.createCipheriv('aes-256-ctr', crypto.createHash('sha256').update(secret).digest(), iv);
     const encrypted = iv.toString('hex') + cipher.update(JSON.stringify({ n1: { token: 'abc' } }), 'utf8', 'base64') + cipher.final('base64');
     assert.deepStrictEqual(decryptCredentials({ $: encrypted }, secret), { n1: { token: 'abc' } });
+});
+
+test('CLI selects a disabled flow tab with its config nodes', () => {
+    const selected = selectFlow([
+        { id: 'active', type: 'tab' },
+        { id: 'disabled', type: 'tab', disabled: true },
+        { id: 'active-node', z: 'active', type: 'example', wires: [] },
+        { id: 'disabled-node', z: 'disabled', type: 'example', wires: [] },
+        { id: 'config', type: 'config' },
+    ], 'disabled');
+    assert.deepStrictEqual(selected.map((node) => node.id), ['disabled', 'disabled-node', 'config']);
+    assert.strictEqual(selected[0].disabled, false);
 });
 
 test('CLI loads declared package nodes and lets aliases register', async () => {

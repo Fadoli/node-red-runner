@@ -56,6 +56,25 @@ npx node-red-runner --user-dir ~/.node-red --port 1880
 Use `node runflow.js --help` from a checkout to list flow, credentials, and
 settings-file overrides.
 
+### Run a disabled tab from Node-RED
+
+Install this package in the parent Node-RED user directory and add a
+**runner flow** node to an enabled tab. Configure the ID of a disabled tab and
+an unused TCP port. The node starts that tab in an isolated runner process;
+communicate with its HTTP In routes at `http://127.0.0.1:<port>/...`.
+Its output emits one message per second with `payload.cpu` (user time, system
+time, and interval CPU percentage) and `payload.memory` (`process.memoryUsage`
+bytes).
+
+Each runner-flow node stores its state under:
+
+```text
+<user-dir>/.node-red-runner/<runner-node-id>/context/
+```
+
+The node accepts only disabled tabs. It stops the child runner when the parent
+flow stops or is redeployed.
+
 ## Context persistence
 
 Configure `contextStorage` with a storage-root path to persist node, flow, and

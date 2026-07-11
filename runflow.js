@@ -11,6 +11,9 @@ const usage = `Usage: node runflow.js [options]
   --flow <file>          Flow JSON file (default: flows.json in user-dir)
   --credentials <file>   Credentials JSON file (default: <flow>_cred.json)
   --settings <file>      Settings JS or JSON file (default: settings.js in user-dir)
+  --flow-id <id>         Run only the selected flow tab
+  --context-dir <dir>    Context storage root for this run
+  --metrics-interval <ms> Send CPU and memory metrics over IPC
   --port <number>        HTTP port (default: 1880)
   --help                 Show this help
 `;
@@ -30,6 +33,21 @@ function readOptional(file, fallback) {
     return file && fs.existsSync(file) ? require(file) : fallback;
 }
 
+function selectFlow(flow, flowId) {
+    if (!flowId) return flow;
+    const tab = flow.find((node) => node.type === 'tab' && node.id === flowId);
+    if (!tab) throw new Error(`Unknown flow tab: ${flowId}`);
+
+    const subflowIds = new Set(flow.filter((node) => node.type === 'subflow').map((node) => node.id));
+    return flow.filter((node) =>
+        node.id === flowId
+        || node.z === flowId
+        || node.type === 'subflow'
+        || subflowIds.has(node.z)
+        || (!node.z && node.wires === undefined && node.type !== 'tab'),
+    ).map((node) => node.id === flowId ? { ...node, disabled: false } : node);
+}
+
 function decryptCredentials(credentials, secret) {
     if (!credentials.$) return credentials;
     if (!secret) throw new Error('Encrypted credentials require credentialSecret in settings');
@@ -46,12 +64,32 @@ function importCoreNodes(reader) {
     try {
         const core = path.join(path.dirname(require.resolve('@node-red/nodes/package.json')), 'core');
         return fs.readdirSync(core, { recursive: true })
-            .filter((file) => file.endsWith('.js'))
+            .filter((file) => file.endsWith('.js') && !file.split(path.sep).includes('lib'))
             .map((file) => reader.importFile(path.join(core, file)));
     } catch (err) {
         if (err.code === 'MODULE_NOT_FOUND') return [];
         throw err;
     }
+}
+
+function startMetrics(interval) {
+    if (!process.send || !Number.isInteger(interval) || interval < 1) return () => {};
+    let previousCpu = process.cpuUsage();
+    let previousAt = process.hrtime.bigint();
+    const timer = setInterval(() => {
+        const now = process.hrtime.bigint();
+        const cpu = process.cpuUsage(previousCpu);
+        const elapsedUs = Number(now - previousAt) / 1000;
+        previousCpu = process.cpuUsage();
+        previousAt = now;
+        process.send({
+            type: 'metrics',
+            cpu: { userUs: cpu.user, systemUs: cpu.system, percent: (cpu.user + cpu.system) / elapsedUs * 100 },
+            memory: process.memoryUsage(),
+        });
+    }, interval);
+    timer.unref();
+    return () => clearInterval(timer);
 }
 
 async function main(argv = process.argv.slice(2), dependencies = {}) {
@@ -70,13 +108,14 @@ async function main(argv = process.argv.slice(2), dependencies = {}) {
     const settingsFile = path.resolve(options.settings || path.join(userDir, 'settings.js'));
     const settings = readOptional(settingsFile, {});
     const runtimeConfig = readOptional(path.join(userDir, '.config.runtime.json'), {});
-    const flow = require(flowFile);
+    const flow = selectFlow(require(flowFile), options['flow-id']);
     const credentials = decryptCredentials(
         readOptional(credentialFile, {}),
         settings.credentialSecret || settings._credentialSecret || runtimeConfig._credentialSecret,
     );
+    const cleanedFlow = runtime.clearFlow(flow);
     const reader = new Reader(path.join(userDir, 'node_modules'), true);
-    reader.registerFlows(runtime.clearFlow(flow));
+    reader.registerFlows(cleanedFlow);
 
     const nodes = loadCoreNodes(reader);
     const userPackage = readOptional(path.join(userDir, 'package.json'), { dependencies: {} });
@@ -84,11 +123,16 @@ async function main(argv = process.argv.slice(2), dependencies = {}) {
         nodes.push(...reader.importModule(dependency));
     }
 
+    if (options['context-dir']) {
+        settings.contextStorage = { ...settings.contextStorage, file: path.resolve(options['context-dir']) };
+    }
     runtime.settings(settings);
-    await runtime.load(nodes, flow, credentials);
+    await runtime.load(nodes, cleanedFlow, credentials);
     await runtime.startServer(Number(options.port || 1880));
+    const stopMetrics = startMetrics(Number(options['metrics-interval']));
 
     const stop = async () => {
+        stopMetrics();
         await runtime.unload();
         await runtime.stopServer();
     };
@@ -103,4 +147,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { decryptCredentials, main, parseArgs, usage };
+module.exports = { decryptCredentials, main, parseArgs, selectFlow, startMetrics, usage };

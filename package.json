@@ -22,6 +22,11 @@
     "bin": {
         "node-red-runner": "runflow.js"
     },
+    "node-red": {
+        "nodes": {
+            "runner-flow": "nodes/runner-flow.js"
+        }
+    },
     "directories": {
         "test": "test"
     },

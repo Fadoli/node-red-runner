@@ -1,54 +1,97 @@
-# Node-Red-Runner
+# Node-RED Runner
 
-## Status
+`@fadoli/node-red-runner` is a lightweight runtime and test-helper-compatible
+way to execute Node-RED flows. It loads only the node modules referenced by a
+flow, has no editor or admin UI, and focuses on small, programmatically managed
+deployments.
 
-This is still a Work-In-Progress, as such any APIs or files are highly likely to be modified at anytime.
+## Project status
 
-HTTP-IN - RESPONSE is currently brokken because of the use of hyper-express.
+The runtime is actively implemented and covered by the repository test suite.
+Its public API is still evolving, so treat upgrades as potentially breaking.
+It is not a drop-in replacement for the complete Node-RED application.
 
-## Goals
+Current coverage includes:
 
-The goal of this repository is to provide a fast and lightweight implementation of node-red-test-helper and node-red runtime.
+- `node-red-test-helper`-style flow loading, node lookup, server lifecycle, and
+  message/event helpers;
+- Node-RED core nodes, including Inject, Function, Change, Template, JSON,
+  Switch, Delay, File, HTTP In, and HTTP Response;
+- Catch, Complete, Status, Link In/Out/Call, and nested subflows;
+- dependency-ordered config-node startup, rollback on failed startup, and
+  encrypted credentials;
+- disk-backed node, flow, and global context.
 
-To achieve this goal, here are the main differences :
+The project intentionally omits the Node-RED editor and admin APIs. Node
+compatibility is determined by the node's runtime requirements, not its editor
+metadata alone.
 
-1. This is not Node-Red, and the goal is not to be identical to it, as such we drop everything that is UI related, instead this aims to provide a Read-Only execution context
-1. This repository is recent and does not have to bear with years of technical debts, recent nodejs APIs are used.
-1. Fancy things such as "not loading all nodes" into the runtime are done to reduce memory usage and startup time, at the cost of risking some incompatibilities.
-1. Events in the runtime are greatly modified, there is no plan here to have things such as hooks for whenever messages are being handled, we want to keep the flow execution simple, external tools are to be used for profiling / debuging.
-
-Some additionnal optimisation are planned like the usage of "compiled" node.send functions, simplified context management ...
-
-## Context persistence
-
-Context storage can now be persisted to disk through helper settings. When `contextStorage.file` is set, the runtime reloads the stored context before flows start and periodically flushes updates back to disk.
+## Use as a test helper
 
 ```js
 const helper = require('@fadoli/node-red-runner');
+const lowerCase = require('./nodes/lower-case');
 
+await helper.load(lowerCase, [
+    { id: 'lower', type: 'lower-case', wires: [['result']] },
+    { id: 'result', type: 'helper' },
+]);
+
+helper.getNode('lower').receive({ payload: 'HELLO' });
+const message = await helper.awaitNodeInput('result');
+console.log(message.payload); // hello
+
+await helper.unload();
+```
+
+## Run a flow
+
+The CLI loads a Node-RED user directory, its flow, settings, credentials, core
+nodes, and declared user-directory dependencies:
+
+```sh
+npx node-red-runner --user-dir ~/.node-red --port 1880
+```
+
+Use `node runflow.js --help` from a checkout to list flow, credentials, and
+settings-file overrides.
+
+## Context persistence
+
+Configure `contextStorage` with a storage-root path to persist node, flow, and
+global context. Persistence is enabled automatically when `file` (or its
+`path` alias) is set; context reloads before flows start and flushes on the
+configured interval and during shutdown.
+
+```js
 helper.settings({
     contextStorage: {
-        file: './.node-red-runner/context.json',
+        file: './.node-red-runner/context',
         saveInterval: 5000,
         compressionThreshold: 256 * 1024,
+        backup: true,
     },
 });
 ```
 
-The configured `file` acts as the storage root name. With the example above, the runtime writes:
+If `file` has an extension, it is removed when deriving the storage root. The
+example writes `./.node-red-runner/context/global.json`, plus
+`./.node-red-runner/context/<flow-id>.json` and
+`./.node-red-runner/context/<flow-id>/<node-id>.json`. Files above
+`compressionThreshold` use built-in zlib compression; `backup` controls
+backup-file creation.
 
-```text
-./.node-red-runner/context/global.json
-./.node-red-runner/context/<flow-id>.json
-./.node-red-runner/context/<flow-id>/<node-id>.json
+## Development
+
+```sh
+npm test
+npm run bench -- --runs 20 --messages 1000000
 ```
 
-Files above `compressionThreshold` are automatically compressed with built-in zlib so no extra dependency is required.
+The [benchmark harness](bench/README.md) compares cold startup, shutdown, and
+10,000-message-chunk flow throughput with Node-RED using the same flow.
 
 ## License
 
-This project is available under AGPL-3.0-or-later. Commercial licensing is available from the copyright holder; see [LICENSE](LICENSE).
-
-## Benchmarks
-
-The runner aims to reduce startup time, memory consumption, and CPU overhead for small flows. Historical measurements are not treated as current claims: the reproducible [benchmark harness](bench/README.md) compares the runner against Node-RED using the same Inject flow.
+This project is available under AGPL-3.0-or-later. Commercial licensing is
+available from the copyright holder; see [LICENSE](LICENSE).

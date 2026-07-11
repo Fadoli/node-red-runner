@@ -62,9 +62,12 @@ Install this package in the parent Node-RED user directory and add a
 **runner flow** node to an enabled tab. Configure the ID of a disabled tab and
 an unused TCP port. The node starts that tab in an isolated runner process;
 communicate with its HTTP In routes at `http://127.0.0.1:<port>/...`.
-Its output emits one message per second with `payload.cpu` (user time, system
-time, and interval CPU percentage) and `payload.memory` (`process.memoryUsage`
-bytes).
+Its output emits one message per second with `payload.type === 'metrics'`,
+`payload.cpu` (user time, system time, and interval CPU percentage), and
+`payload.memory` (`process.memoryUsage` bytes). Subprocess output uses the same
+port with `payload.type === 'stdout'` or `'stderr'` and text in `payload.data`.
+Use **Emit output** to enable or disable those stream messages, and **Mirror to
+console** to write them to the parent Node-RED process stdout/stderr instead.
 
 Each runner-flow node stores its state under:
 

@@ -73,17 +73,18 @@ test('runner-flow runs a disabled tab with isolated context', async (t) => {
     node.error = (error) => { throw error; };
     const metrics = [];
     node.send = (message) => metrics.push(message);
-    Node.call(node, { flowId: 'disabled', port });
+    Node.call(node, { flowId: 'disabled', port, forwardOutput: false });
     t.after(async () => {
         if (node.listenerCount('close')) await new Promise((resolve) => node.emit('close', resolve));
         await fs.rm(userDir, { recursive: true, force: true });
     });
 
     await waitForPort(port);
-    await waitFor(() => metrics.length > 0);
-    assert.equal(metrics[0].payload.type, 'metrics');
-    assert.equal(typeof metrics[0].payload.cpu.percent, 'number');
-    assert.equal(typeof metrics[0].payload.memory.rss, 'number');
+    await waitFor(() => metrics.some((message) => message.payload.type === 'metrics'));
+    const metric = metrics.find((message) => message.payload.type === 'metrics').payload;
+    assert.equal(typeof metric.cpu.percent, 'number');
+    assert.equal(typeof metric.memory.rss, 'number');
+    assert.ok(metrics.every((message) => message.payload.type === 'metrics'));
     await new Promise((resolve) => node.emit('close', resolve));
     assert.ok(await fs.stat(path.join(userDir, '.node-red-runner', 'runner-node', 'context')));
 });

@@ -15,6 +15,8 @@ function runnerFlow(RED) {
         RED.nodes.createNode(this, config);
         const node = this;
         const port = Number(config.port);
+        const forwardOutput = config.forwardOutput !== false && config.forwardOutput !== 'false';
+        const forwardToConsole = config.forwardToConsole === true || config.forwardToConsole === 'true';
         const flowFile = resolveFlowFile(RED.settings);
         const flow = JSON.parse(fs.readFileSync(flowFile, 'utf8'));
         const tab = flow.find((entry) => entry.type === 'tab' && entry.id === config.flowId);
@@ -38,9 +40,19 @@ function runnerFlow(RED) {
             '--context-dir', contextDir,
             '--metrics-interval', '1000',
             '--port', String(port),
-        ], { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+        ], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
 
-        child.stderr.on('data', (data) => { stderr += data; });
+        child.stdout.on('data', (data) => {
+            const text = data.toString();
+            if (forwardToConsole) process.stdout.write(text);
+            if (forwardOutput) node.send({ payload: { type: 'stdout', data: text } });
+        });
+        child.stderr.on('data', (data) => {
+            const text = data.toString();
+            stderr += text;
+            if (forwardToConsole) process.stderr.write(text);
+            if (forwardOutput) node.send({ payload: { type: 'stderr', data: text } });
+        });
         child.on('message', (message) => {
             if (message.type === 'metrics') node.send({ payload: message });
         });

@@ -4,7 +4,6 @@ const log = require('./utils/log');
 const registry = require('./registry');
 const context = require('./context');
 const crypto = require('crypto');
-const express = require('express');
 const http = require('http');
 
 const nrUtils = require('./utils/node-red');
@@ -70,10 +69,19 @@ const api = {
     settings: {}
 }
 
-const app = express();
-// Node-RED's HTTP nodes still use Express 4's private router name.
-Object.defineProperty(app, '_router', { get: () => app.router });
-api.httpAdmin = api.httpNode = app;
+let app;
+function getApp() {
+    if (!app) {
+        app = require('express')();
+        // Node-RED's HTTP nodes still use Express 4's private router name.
+        Object.defineProperty(app, '_router', { get: () => app.router });
+    }
+    return app;
+}
+Object.defineProperties(api, {
+    httpAdmin: { get: getApp },
+    httpNode: { get: getApp },
+});
 let server;
 
 function findConfigReferences(value, configIds, references, referenced) {
@@ -294,7 +302,7 @@ const output = {
             return Promise.resolve();
         }
         return new Promise((resolve, reject) => {
-            server = http.createServer(app);
+            server = http.createServer(getApp());
             server.once('error', (err) => {
                 server = undefined;
                 reject(err);
@@ -324,7 +332,7 @@ const output = {
         return api.settings;
     },
     getApp() {
-        return app;
+        return getApp();
     },
     getServerAddress() {
         return server && server.address();

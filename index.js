@@ -1,6 +1,5 @@
 const runtime = require('./src/runtime');
 const registry = require('./src/registry');
-const request = require('supertest');
 const clone = require('./src/utils/node-red').cloneMessage;
 const expandSubflows = require('./src/subflow');
 const registerBuiltins = require('./src/builtins');
@@ -199,7 +198,7 @@ const helper = {
         if (userSettings) runtime.settings(userSettings);
         return helper;
     },
-    request: () => request(runtime.getApp()),
+    request: () => require('supertest')(runtime.getApp()),
     url: () => {
         const address = runtime.getServerAddress();
         return address && `http://127.0.0.1:${address.port}`;

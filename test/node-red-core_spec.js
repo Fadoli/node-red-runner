@@ -72,6 +72,21 @@ test('serves HTTP In through Function and HTTP Response', async () => {
     await helper.request().post('/compat').send({ value: 42 }).expect(201, { received: 42 });
 });
 
+test('passes HTTP request data through a flow response', async () => {
+    const flow = [
+        { id: 'in', z: 'flow', type: 'http in', method: 'post', url: '/orders/:id', wires: [['function']] },
+        { id: 'function', z: 'flow', type: 'function', func: "msg.payload = { id: msg.req.params.id, dryRun: msg.req.query.dryRun === 'true', requestId: msg.req.get('x-request-id'), value: msg.payload.value }; msg.statusCode = 201; msg.headers = { 'x-flow': 'runner' }; return msg;", outputs: 1, wires: [['out']] },
+        { id: 'out', z: 'flow', type: 'http response', wires: [] },
+    ];
+    await helper.load([http, functionNode], flow);
+    await helper.request()
+        .post('/orders/42?dryRun=true')
+        .set('x-request-id', 'request-1')
+        .send({ value: 7 })
+        .expect('x-flow', 'runner')
+        .expect(201, { id: '42', dryRun: true, requestId: 'request-1', value: 7 });
+});
+
 test('runs optional Node-RED Template, JSON, Switch and Delay nodes', async () => {
     const flow = [
         { id: 'template', z: 'flow', type: 'template', field: 'payload', fieldType: 'msg', syntax: 'mustache', output: 'str', template: '{"value":"{{payload}}"}', wires: [['json']] },

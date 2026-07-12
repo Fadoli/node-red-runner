@@ -4,13 +4,24 @@ const registry = require("./registry");
 const context = require('./context');
 const crypto = require('crypto');
 
+let messageIdPrefix = crypto.randomUUID().slice(0, 24);
+let nextMessageId = 0;
+
+function generateMessageId() {
+    if (nextMessageId === 0x1000000000000) {
+        messageIdPrefix = crypto.randomUUID().slice(0, 24);
+        nextMessageId = 0;
+    }
+    return messageIdPrefix + (nextMessageId++).toString(16).padStart(12, '0');
+}
+
 function NOOP () { }
 
 function sendMessage(targets, msg) {
     if (msg === null || msg === undefined) {
         return;
     }
-    if (msg._msgid === undefined) msg._msgid = crypto.randomUUID();
+    if (msg._msgid === undefined) msg._msgid = generateMessageId();
     if (targets.length === 1) {
         targets[0].receive(msg);
     } else {

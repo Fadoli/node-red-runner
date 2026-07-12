@@ -1,6 +1,4 @@
 const clone = require('fast-copy').copy;
-const jsonata = require('jsonata');
-const moment = require('moment-timezone');
 
 const own = Object.prototype.hasOwnProperty;
 const getSetting = (node, name) => node?.getSetting ? node.getSetting(name) : process.env[name];
@@ -145,11 +143,11 @@ function evaluateNodeProperty(value, type, node, message, callback) {
 }
 
 function prepareJSONataExpression(value, node) {
-    const expression = jsonata(value);
+    const expression = require('jsonata')(value);
     expression.assign('flowContext', (key, store) => node ? node.context().flow.get(key, store) : '');
     expression.assign('globalContext', (key, store) => node ? node.context().global.get(key, store) : '');
     expression.assign('env', (name) => getSetting(node, name) ?? '');
-    expression.assign('moment', moment);
+    expression.assign('moment', require('moment-timezone'));
     expression.registerFunction('clone', cloneMessage, '<(oa)-:o>');
     expression._legacyMode = /(^|[^a-zA-Z0-9_'".])msg([^a-zA-Z0-9_'"]|$)/.test(value);
     expression._node = node;

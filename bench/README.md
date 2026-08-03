@@ -26,6 +26,17 @@ bun bench/measure.js --runs 20 --messages 1000000
 | runner | 20 | 1000000 | 16.54 | 0.53 | 139.84 | 7151122.82 | 17.00 | 146.84 |
 | node-red | 20 | 1000000 | 714.95 | 1.30 | 1677.91 | 595981.27 | 729.55 | 278.00 |
 
+### bun 1.4.0
+
+```sh
+bun bench/measure.js --runs 20 --messages 1000000
+```
+
+| target | runs | messages | startupMs | stopMs | flowMs | msgPerSec | cpuMs | rssMiB |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| runner | 20 | 1000000 | 15.22 | 0.51 | 154.30 | 6480862.71 | 16.40 | 88.58 |
+| node-red | 20 | 1000000 | 582.80 | 1.16 | 1630.69 | 613238.37 | 572.70 | 159.56 |
+
 ## Run it yourself
 
 Run the small-flow baseline with:

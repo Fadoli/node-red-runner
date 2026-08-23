@@ -15,6 +15,7 @@ if (!expect) {
 
 const helper = require("../index.js");
 const assert = require("node:assert");
+const Node = require("../src/node");
 
 describe('helper spec', function () {
     afterEach(() => helper.unload());
@@ -27,6 +28,13 @@ describe('helper spec', function () {
         await helper.startServer(0);
         await helper.startServer(0);
         await helper.stopServer();
+    });
+
+    test('provides a safe send function before node startup', () => {
+        const node = new Node({ id: 'early-send', type: 'early-send', wires: [] });
+        node.on('input', (msg, send) => send(msg));
+        assert.doesNotThrow(() => node.receive({ payload: 1 }));
+        assert.doesNotThrow(() => node.receive({ payload: 2 }, undefined));
     });
 
     test('loads referenced config nodes before their users', async function () {

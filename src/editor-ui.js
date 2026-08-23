@@ -21,5 +21,6 @@ load();
 </script></body></html>`;
 
 module.exports = function mountEditorUi(app) {
+    app.get('/', (req, res) => res.redirect('/editor'));
     app.get('/editor', (req, res) => res.type('html').send(html));
 };

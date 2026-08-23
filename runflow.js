@@ -114,7 +114,7 @@ async function main(argv = process.argv.slice(2), dependencies = {}) {
     const flowFile = resolveFlowFile(userDir, options.flow);
     const credentialFile = path.resolve(options.credentials || flowFile.replace(/\.json$/, '_cred.json'));
     const settingsFile = path.resolve(options.settings || path.join(userDir, 'settings.js'));
-    const settings = readOptional(settingsFile, {});
+    const settings = { ...readOptional(settingsFile, {}), userDir, flowFile };
     const runtimeConfig = readOptional(path.join(userDir, '.config.runtime.json'), {});
     const flow = selectFlow(require(flowFile), options['flow-id']);
     const credentials = decryptCredentials(

@@ -36,6 +36,7 @@ test('editor API rewires without restarting unchanged nodes', async () => {
         { id: 'first', type: 'editor-target', wires: [] },
         { id: 'second', type: 'editor-target', wires: [] },
     ]);
+    await helper.request().get('/').expect(302).expect('Location', '/editor');
     await helper.request().get('/editor').expect(200).expect('Content-Type', /html/);
     const first = helper.getNode('first');
     const source = helper.getNode('source');
@@ -101,6 +102,15 @@ test('restarting an HTTP node does not leave duplicate routes', async () => {
         changes: [{ op: 'update-node', id: 'http', set: { value: 'new' } }],
     }).expect(200);
     await helper.request().get('/editor-route').expect(200, 'new');
+});
+
+test('accepts Express 4 wildcard routes used by Node-RED nodes', async () => {
+    await helper.load((RED) => {
+        RED.nodes.registerType('editor-legacy-wildcard', function () {
+            RED.httpNode.get('/debug/view/*', (req, res) => res.send(req.params[0]));
+        });
+    }, [{ id: 'legacy', type: 'editor-legacy-wildcard', wires: [] }]);
+    await helper.request().get('/debug/view/a/b').expect(200, 'a/b');
 });
 
 test('failed partial deployment restores the previous node', async () => {

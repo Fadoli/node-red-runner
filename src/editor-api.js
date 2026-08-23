@@ -107,14 +107,17 @@ function createEditorApi({ store, runtime, registry }) {
         const send = (event, value) => res.write(`event: ${event}\ndata: ${JSON.stringify(value)}\n\n`);
         const onDeploy = (value) => send('deploy', value);
         const onStatus = (value) => send('status', value);
+        const onComms = (value) => send(value.topic || 'comms', value.message);
         runtime.events.on('editor-deployed', onDeploy);
         runtime.events.on('status', onStatus);
+        runtime.events.on('comms', onComms);
         const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000);
         heartbeat.unref();
         req.on('close', () => {
             clearInterval(heartbeat);
             runtime.events.off('editor-deployed', onDeploy);
             runtime.events.off('status', onStatus);
+            runtime.events.off('comms', onComms);
         });
     });
 

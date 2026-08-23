@@ -67,13 +67,46 @@ const api = {
     },
     httpNode: undefined,
     httpAdmin: undefined,
+    comms: {
+        publish: (topic, message) => {
+            output.events.emit('comms', { topic, message });
+        },
+    },
     settings: {}
 }
 
 let app;
+function patchLegacyWildcardRoutes(application) {
+    if (application._legacyWildcardRoutesPatched) return;
+    application._legacyWildcardRoutesPatched = true;
+    const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head', 'all', 'use'];
+    for (const method of methods) {
+        const original = application[method];
+        if (typeof original !== 'function') continue;
+        application[method] = function patchedRoute(path, ...handlers) {
+            if (typeof path !== 'string' || !path.endsWith('/*')) {
+                return original.call(this, path, ...handlers);
+            }
+            const rewrittenPath = `${path.slice(0, -1)}*legacySplat`;
+            const wrappedHandlers = handlers.map((handler) => {
+                if (typeof handler !== 'function') return handler;
+                return function legacyWildcardHandler(req, res, next) {
+                    if (req.params && req.params.legacySplat !== undefined && req.params[0] === undefined) {
+                        const value = req.params.legacySplat;
+                        req.params[0] = Array.isArray(value) ? value.join('/') : value;
+                    }
+                    return handler.call(this, req, res, next);
+                };
+            });
+            return original.call(this, rewrittenPath, ...wrappedHandlers);
+        };
+    }
+}
+
 function getApp() {
     if (!app) {
         app = require('express')();
+        patchLegacyWildcardRoutes(app);
         // Node-RED's HTTP nodes still use Express 4's private router name.
         Object.defineProperty(app, '_router', { get: () => app.router });
     }

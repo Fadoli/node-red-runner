@@ -20,7 +20,7 @@ function parseEditorHtml(filePath) {
         const editorIcon = (source.match(/\bicon\s*:\s*["']([^"']+)["']/i) || [])[1];
         const category = (source.match(/\bcategory\s*:\s*["']([^"']+)["']/i) || [])[1];
         const defaults = {};
-        const defaultsBlock = source.match(/\bdefaults\s*:\s*\{([\s\S]*?)\n\s*\},\s*(?:credentials|inputs|outputs|icon|color)/i);
+        const defaultsBlock = source.match(/\bdefaults\s*:\s*\{([\s\S]*?)\}\s*,\s*(?:credentials|inputs|outputs|icon|color)/i);
         if (defaultsBlock) for (const match of defaultsBlock[1].matchAll(/\b([A-Za-z_$][\w$]*)\s*:\s*\{\s*value\s*:\s*([^,}\n]+)/g)) {
             const raw = match[2].trim();
             defaults[match[1]] = raw === 'true' ? true : raw === 'false' ? false : raw === 'null' ? null : (/^-?\d+(?:\.\d+)?$/.test(raw) ? Number(raw) : raw.replace(/^['"]|['"]$/g, ''));

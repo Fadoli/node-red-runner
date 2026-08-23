@@ -89,7 +89,8 @@ function flowIsDisabled(flowTab) { const realTab = state.flow.flows.find(node =>
 function renderInspector() {
     const node = selected(); if (state.selectedIds.size > 1) { inspector.innerHTML = '<div class="empty">'+state.selectedIds.size+' nodes selected.<br>Hold Shift to adjust the selection.</div>'; return; } if (!node) { inspector.innerHTML = '<div class="empty">Select a node to edit its properties.</div>'; return; }
     inspector.replaceChildren(); const heading = document.createElement('div'); heading.className = 'field'; heading.innerHTML = '<strong>'+String(node.name || node.type || node.id)+'</strong>'; inspector.append(heading);
-    for (const key in node) { if (locked.has(key) || key[0] === '_') continue; const field = document.createElement('div'); field.className = 'field'; const label = document.createElement('label'); label.textContent = key; field.append(label); const original = node[key]; let input;
+    const definition = state.types.find(item => item.type === node.type) || {}; const editable = new Set(Object.keys(definition.editor && definition.editor.defaults || {})); for (const key in node) editable.add(key);
+    for (const key of editable) { if (locked.has(key) || key[0] === '_') continue; const field = document.createElement('div'); field.className = 'field'; const label = document.createElement('label'); label.textContent = key; field.append(label); const defaults = definition.editor && definition.editor.defaults || {}; const original = node[key] !== undefined ? node[key] : defaults[key]; let input;
         if (typeof original === 'boolean') { input = document.createElement('input'); input.type = 'checkbox'; input.checked = original; }
         else if (original && typeof original === 'object') { input = document.createElement('textarea'); input.value = JSON.stringify(original, null, 2); }
         else { input = document.createElement('input'); input.value = original == null ? '' : String(original); }

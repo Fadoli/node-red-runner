@@ -7,10 +7,10 @@ const metrics = document.getElementById('metrics');
 
 const state = {
     flow: { flows: [], rev: '0' }, types: [], tabId: null, selectedId: null,
-    history: [], redo: [], baseline: new Map(), statuses: new Map(), wireMode: false, wireFrom: null, connectDrag: null,
+    history: [], redo: [], baseline: new Map(), statuses: new Map(), connectDrag: null,
     zoom: 1, nodes: new Map(), wires: new Map(), drag: null,
 };
-const NODE_WIDTH = 150;
+const NODE_WIDTH = 140;
 const locked = new Set(['id', 'type', 'z', 'wires', 'x', 'y', 'l', 'w', '_credentialId']);
 const clone = value => JSON.parse(JSON.stringify(value));
 const tabs = () => {
@@ -33,8 +33,9 @@ function undo() { const previous = state.history.pop(); if (!previous) return; s
 function redo() { const next = state.redo.pop(); if (!next) return; state.history.push(clone(state.flow)); restore(next); setStatus('Redo'); }
 function snap(value) { return Math.max(0, Math.round(value / 24) * 24); }
 function point(event) { const box = canvas.getBoundingClientRect(); return { x: (event.clientX - box.left) / state.zoom, y: (event.clientY - box.top) / state.zoom }; }
-function nodePoint(node, side) { return { x: Number(node.x) + (side === 'out' ? NODE_WIDTH : 0), y: Number(node.y) + 29 }; }
-function wirePath(from, to) { const a = nodePoint(from, 'out'), b = nodePoint(to, 'in'); return 'M '+a.x+' '+a.y+' C '+(a.x + 70)+' '+a.y+', '+(b.x - 70)+' '+b.y+', '+b.x+' '+b.y; }
+function portY(index, count) { return count <= 1 ? 29 : 12 + index * (34 / (count - 1)); }
+function nodePoint(node, side, index = 0) { const count = side === 'out' ? Number((state.types.find(item => item.type === node.type) || {}).outputs || 1) : Number((state.types.find(item => item.type === node.type) || {}).inputs || 1); return { x: Number(node.x) + (side === 'out' ? NODE_WIDTH : 0), y: Number(node.y) + portY(index, count) }; }
+function wirePath(from, to, outputIndex = 0) { const a = nodePoint(from, 'out', outputIndex), b = nodePoint(to, 'in', 0); return 'M '+a.x+' '+a.y+' C '+(a.x + 70)+' '+a.y+', '+(b.x - 70)+' '+b.y+', '+b.x+' '+b.y; }
 function ensurePreview() { let preview = document.getElementById('wire-preview'); if (!preview) { preview = document.createElementNS(SVG, 'path'); preview.id = 'wire-preview'; preview.setAttribute('class', 'wire hot'); preview.style.pointerEvents = 'none'; canvas.append(preview); } return preview; }
 function updatePreview(event) { const from = state.connectDrag && state.connectDrag.from; if (!from) return; const a = nodePoint(from, 'out'), cursor = point(event); const preview = ensurePreview(); preview.setAttribute('d', 'M '+a.x+' '+a.y+' C '+(a.x + 70)+' '+a.y+', '+(cursor.x - 70)+' '+cursor.y+', '+cursor.x+' '+cursor.y); }
 function finishConnection(event) { const drag = state.connectDrag; state.connectDrag = null; const preview = document.getElementById('wire-preview'); if (preview) preview.remove(); const element = document.elementFromPoint(event.clientX, event.clientY); const target = element && element.closest ? element.closest('.node') : null; const to = target && state.flow.flows.find(node => node.id === target.dataset.id); if (to && drag && to.id !== drag.from.id) connect(drag.from, to); else renderNodes(); }
@@ -43,13 +44,14 @@ function drawWires() {
     let layer = document.getElementById('wire-layer'); if (!layer) { layer = document.createElementNS(SVG, 'g'); layer.id = 'wire-layer'; canvas.append(layer); }
     layer.replaceChildren(); state.wires.clear(); const visible = new Map(nodes().map(node => [node.id, node]));
     for (const from of nodes()) {
-        const targets = (from.wires || []).flat().concat(from.links || []);
-        for (const id of targets) { const to = visible.get(id) || state.flow.flows.find(node => node.id === id); if (!to || to.z !== from.z) continue;
-            const path = document.createElementNS(SVG, 'path'); path.setAttribute('class', 'wire'); path.dataset.from = from.id; path.dataset.to = to.id; path.setAttribute('d', wirePath(from, to)); layer.append(path); state.wires.set(from.id+'>'+to.id, path);
+        const outputs = from.wires || [];
+        for (let outputIndex = 0; outputIndex < outputs.length; outputIndex++) for (const id of outputs[outputIndex] || []) { const to = visible.get(id) || state.flow.flows.find(node => node.id === id); if (!to || to.z !== from.z) continue;
+            const path = document.createElementNS(SVG, 'path'); path.setAttribute('class', 'wire'); path.dataset.from = from.id; path.dataset.to = to.id; path.dataset.output = outputIndex; path.setAttribute('d', wirePath(from, to, outputIndex)); layer.append(path); state.wires.set(from.id+'>'+to.id+'>'+outputIndex, path);
         }
+        for (const id of from.links || []) { const to = visible.get(id) || state.flow.flows.find(node => node.id === id); if (!to || to.z !== from.z) continue; const path = document.createElementNS(SVG, 'path'); path.setAttribute('class', 'wire'); path.dataset.from = from.id; path.dataset.to = to.id; path.dataset.output = 0; path.setAttribute('d', wirePath(from, to)); layer.append(path); state.wires.set(from.id+'>'+to.id+'>link', path); }
     }
 }
-function updateWirePositions() { for (const path of state.wires.values()) { const from = state.flow.flows.find(node => node.id === path.dataset.from), to = state.flow.flows.find(node => node.id === path.dataset.to); if (from && to) path.setAttribute('d', wirePath(from, to)); } }
+function updateWirePositions() { for (const path of state.wires.values()) { const from = state.flow.flows.find(node => node.id === path.dataset.from), to = state.flow.flows.find(node => node.id === path.dataset.to); if (from && to) path.setAttribute('d', wirePath(from, to, Number(path.dataset.output || 0))); } }
 function selectNode(node) { state.selectedId = node ? node.id : null; renderInspector(); renderNodes(); }
 function renderTabs() { const holder = document.getElementById('tabs'); holder.replaceChildren(); for (const tab of tabs()) { const button = document.createElement('button'); button.className = 'tab'+(activeTab() === tab ? ' active' : ''); button.textContent = tab.label || tab.name || tab.id; button.onclick = () => { state.tabId = tab.id; state.selectedId = null; renderTabs(); renderInspector(); renderNodes(); updateMetrics(); }; holder.append(button); } }
 function makePort(x) { const port = document.createElementNS(SVG, 'circle'); port.setAttribute('class', 'port'); port.setAttribute('cx', x); port.setAttribute('cy', 29); port.setAttribute('r', 6); return port; }
@@ -58,20 +60,19 @@ function renderNodes() {
     layer.replaceChildren(); state.nodes.clear();
     for (const node of nodes()) {
         const group = document.createElementNS(SVG, 'g'); group.dataset.id = node.id; group.setAttribute('class', 'node'+(state.selectedId === node.id ? ' selected' : '')+(modified(node) ? ' modified' : '')); group.setAttribute('transform', 'translate('+node.x+','+node.y+')');
-        const rect = document.createElementNS(SVG, 'rect'); rect.setAttribute('width', NODE_WIDTH); rect.setAttribute('height', 58); rect.setAttribute('rx', 8);
+        const definition = state.types.find(item => item.type === node.type) || {}; const rect = document.createElementNS(SVG, 'rect'); rect.setAttribute('width', NODE_WIDTH); rect.setAttribute('height', 58); rect.setAttribute('rx', 8); if (definition.color) rect.style.fill = definition.color;
         const title = document.createElementNS(SVG, 'text'); title.setAttribute('class', 'title'); title.setAttribute('x', 14); title.setAttribute('y', 24); title.textContent = node.name || node.type || node.id;
         const type = document.createElementNS(SVG, 'text'); type.setAttribute('class', 'type'); type.setAttribute('x', 14); type.setAttribute('y', 43); type.textContent = node.type || '';
         const nodeStatus = document.createElementNS(SVG, 'text'); nodeStatus.setAttribute('class', 'node-status'); nodeStatus.setAttribute('x', 14); nodeStatus.setAttribute('y', 72); nodeStatus.textContent = state.statuses.get(node.id) || '';
-        group.append(rect, title, type, nodeStatus, makePort(0), makePort(NODE_WIDTH));
+        const inputs = Math.max(0, Number(definition.inputs == null ? 1 : definition.inputs)); const outputs = Math.max(0, Number(definition.outputs == null ? 1 : definition.outputs)); for (let port = 0; port < Math.max(inputs, outputs); port++) { if (port < inputs) { const inputPort = makePort(0); inputPort.setAttribute('cy', portY(port, inputs)); group.append(inputPort); } if (port < outputs) { const outputPort = makePort(NODE_WIDTH); outputPort.setAttribute('cy', portY(port, outputs)); group.append(outputPort); } } group.prepend(rect, title, type, nodeStatus);
         group.addEventListener('pointerdown', event => {
             event.preventDefault(); event.stopPropagation(); state.selectedId = node.id; renderInspector();
             if (event.target.classList && event.target.classList.contains('port') && Number(event.target.getAttribute('cx')) > NODE_WIDTH / 2) { state.connectDrag = { from: node, pointerId: event.pointerId }; group.setPointerCapture(event.pointerId); ensurePreview(); return; }
-            if (state.wireMode) { state.wireFrom = node; setStatus('Select target node'); return; }
             const cursor = point(event); state.drag = { node, group, dx: cursor.x - Number(node.x), dy: cursor.y - Number(node.y), pointerId: event.pointerId }; group.setPointerCapture(event.pointerId); saveHistory();
         });
         group.addEventListener('pointermove', event => { if (state.connectDrag && state.connectDrag.from === node) { updatePreview(event); return; } if (!state.drag || state.drag.node !== node) return; const cursor = point(event); node.x = snap(cursor.x - state.drag.dx); node.y = snap(cursor.y - state.drag.dy); group.setAttribute('transform', 'translate('+node.x+','+node.y+')'); updateWirePositions(); updateMetrics(); });
         group.addEventListener('pointerup', event => { if (state.connectDrag && state.connectDrag.from === node) { finishConnection(event); return; } if (!state.drag || state.drag.node !== node) return; state.drag = null; if (group.hasPointerCapture(event.pointerId)) group.releasePointerCapture(event.pointerId); renderNodes(); drawWires(); });
-        group.addEventListener('click', event => { event.stopPropagation(); if (state.wireMode && state.wireFrom && state.wireFrom !== node) { connect(state.wireFrom, node); state.wireMode = false; state.wireFrom = null; } });
+        group.addEventListener('click', event => { event.stopPropagation(); });
         layer.append(group); state.nodes.set(node.id, group);
     }
     drawWires();
@@ -103,3 +104,26 @@ debugButton.onclick = () => debugPanel.classList.toggle('open');
 document.getElementById('debug-pause').onclick = event => { debugPaused = !debugPaused; event.currentTarget.textContent = debugPaused ? 'Resume' : 'Pause'; };
 document.getElementById('debug-clear').onclick = () => { debugLog.replaceChildren(); debugEvents = 0; debugCount.textContent = '0 events'; };
 try { const stream = new EventSource('/api/editor/events'); stream.addEventListener('status', event => { appendDebug(event.data, 'status'); try { const value = JSON.parse(event.data), source = value.source || {}, status = value.status || {}; if (source.id) { state.statuses.set(source.id, status.text || status.fill || status.shape || String(status)); renderNodes(); } } catch {} }); stream.addEventListener('deploy', event => appendDebug('deploy '+event.data, 'status')); stream.addEventListener('comms', event => appendDebug(event.data)); stream.onerror = () => appendDebug('event stream disconnected', 'error'); } catch (error) { appendDebug(error.message, 'error'); }
+const sidebar = document.querySelector('.side.right');
+const contextPane = document.createElement('div'); contextPane.className = 'context-pane'; contextPane.innerHTML = '<div class="context-title">Select a node to inspect context</div>';
+const sidebarTabs = document.createElement('div'); sidebarTabs.className = 'sidebar-tabs';
+const sidebarBody = document.createElement('div'); sidebarBody.className = 'sidebar-body';
+const inspectorPane = document.createElement('div'); inspectorPane.className = 'sidebar-pane active'; inspectorPane.append(inspector);
+const sidebarDebug = document.createElement('div'); sidebarDebug.className = 'sidebar-pane'; sidebarDebug.append(debugPanel);
+sidebar.replaceChildren(sidebarTabs, sidebarBody); sidebarBody.append(inspectorPane, sidebarDebug, contextPane);
+for (const [label, pane] of [['Inspector', inspectorPane], ['Debug', sidebarDebug], ['Context', contextPane]]) { const button = document.createElement('button'); button.textContent = label; button.onclick = () => { for (const child of sidebarBody.children) child.classList.remove('active'); pane.classList.add('active'); for (const child of sidebarTabs.children) child.classList.remove('active'); button.classList.add('active'); if (label === 'Context') loadContext(); }; sidebarTabs.append(button); if (label === 'Inspector') button.classList.add('active'); }
+debugPanel.classList.remove('debug-panel'); debugPanel.style.display = 'block'; debugPanel.style.position = 'static'; debugPanel.style.height = '100%'; debugPanel.style.boxShadow = 'none';
+const sidebarStyle = document.createElement('style'); sidebarStyle.textContent = '.right{padding:0!important;display:flex;flex-direction:column}.sidebar-tabs{display:flex;border-bottom:1px solid var(--line);background:#111821}.sidebar-tabs button{flex:1;border:0;border-radius:0;color:var(--muted)}.sidebar-tabs button.active{color:var(--text);border-bottom:2px solid var(--accent)}.sidebar-body{min-height:0;flex:1;overflow:auto}.sidebar-pane{display:none;height:100%;padding:14px;overflow:auto}.sidebar-pane.active{display:block}.sidebar-debug{padding:0}.sidebar-debug .debug-head{position:sticky;top:0}.sidebar-debug .debug-panel pre{height:calc(100% - 38px)}.context-pane pre{white-space:pre-wrap;color:#b9d5eb;font:12px ui-monospace,monospace}.context-title{color:var(--muted);margin-bottom:10px}'; document.head.append(sidebarStyle);
+async function loadContext() { const id = state.selectedId; if (!id) { contextPane.innerHTML = '<div class="context-title">Select a node to inspect context</div>'; return; } try { const value = await (await fetch('/api/editor/context/'+encodeURIComponent(id))).json(); contextPane.innerHTML = '<div class="context-title">Node / flow / global context</div><pre>'+escapeHtml(JSON.stringify(value, null, 2))+'</pre>'; } catch (error) { contextPane.textContent = error.message; } }
+function escapeHtml(value) { return String(value).replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char])); }
+let contextSelection = null; setInterval(() => { if (contextSelection !== state.selectedId) { contextSelection = state.selectedId; loadContext(); } }, 400);
+const legacyWireButton = document.getElementById('wire'); if (legacyWireButton) { legacyWireButton.style.display = 'none'; legacyWireButton.onclick = null; }
+if (debugButton) debugButton.style.display = 'none';
+document.addEventListener('keydown', event => { if (event.key === 'w' || event.key === 'W') { event.preventDefault(); event.stopImmediatePropagation(); } }, true);
+function renderPalette() {
+    const query = document.getElementById('search').value.toLowerCase(); palette.replaceChildren();
+    const groups = new Map(), hidden = new Set(['tab', 'helper', '__subflow', '__subflow-output']);
+    for (const definition of state.types) { if (hidden.has(definition.type) || (query && !definition.type.toLowerCase().includes(query))) continue; const category = definition.category || (definition.type === 'inject' || definition.type === 'catch' || definition.type === 'status' ? 'Input' : definition.type === 'debug' || definition.type === 'link out' ? 'Output' : 'Function'); if (!groups.has(category)) groups.set(category, []); groups.get(category).push(definition); }
+    for (const [category, definitions] of groups) { const section = document.createElement('section'); section.className = 'palette-group'; const heading = document.createElement('h4'); heading.textContent = category; section.append(heading); for (const definition of definitions) { const button = document.createElement('button'); button.className = 'palette-node'; button.style.setProperty('--node-color', definition.color || '#52708b'); const icon = document.createElement('span'); icon.className = 'palette-icon'; icon.textContent = definition.icon ? '◆' : '●'; const name = document.createElement('strong'); name.textContent = definition.type; const ports = document.createElement('small'); ports.textContent = (definition.inputs == null ? '1' : definition.inputs)+' in · '+(definition.outputs == null ? '1' : definition.outputs)+' out'; button.append(icon, name, ports); button.onclick = () => { saveHistory(); const node = { id: 'ui-'+Math.random().toString(36).slice(2, 9), type: definition.type, x: 120, y: 120, wires: [[]], ...(definition.editor && definition.editor.defaults || {}) }; if (activeTab()) node.z = activeTab().id; state.flow.flows.push(node); selectNode(node); renderNodes(); updateMetrics(); }; section.append(button); } palette.append(section); }
+}
+const paletteStyle = document.createElement('style'); paletteStyle.textContent = '.palette-group{margin:0 0 16px}.palette-group h4{margin:14px 0 7px;color:#9fb2c5;font-size:10px;letter-spacing:1.2px;text-transform:uppercase}.palette-node{position:relative;display:grid!important;grid-template-columns:22px 1fr;grid-template-rows:1fr 1fr;column-gap:7px;width:100%;padding:8px 9px!important;text-align:left;border:1px solid #2b3c4f;border-left:3px solid var(--node-color);background:#182330;border-radius:6px}.palette-node:hover{background:#223346;border-color:var(--node-color)}.palette-node strong{font-size:12px;line-height:15px}.palette-node small{grid-column:2;color:#8295a8;font-size:10px}.palette-icon{grid-row:1 / span 2;align-self:center;color:var(--node-color);font-size:12px}'; document.head.append(paletteStyle);

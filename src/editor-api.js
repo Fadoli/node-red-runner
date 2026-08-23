@@ -1,5 +1,6 @@
 const express = require('express');
 const { compileFlow, diffCompiled } = require('./compiler');
+const context = require('./context');
 
 function credentialsChanged(previous, next) {
     const changed = new Set();
@@ -54,11 +55,31 @@ function createEditorApi({ store, runtime, registry }) {
             const credentials = definition.options && definition.options.credentials;
             types.push({
                 type,
+                inputs: Number.isInteger(definition.options && definition.options.inputs) ? definition.options.inputs : null,
+                outputs: Number.isInteger(definition.options && definition.options.outputs) ? definition.options.outputs : null,
+                color: definition.options && definition.options.color || null,
+                icon: definition.options && definition.options.icon || null,
+                category: definition.options && definition.options.category || null,
                 credentials: credentials ? Object.keys(credentials) : [],
                 editor: definition.options && definition.options.editor,
             });
         }
         res.json(types);
+    });
+
+    router.get('/context/:id', (req, res) => {
+        try {
+            const node = store.flows.find(item => item.id === req.params.id);
+            const ctx = context.getContext(req.params.id, node && node.z);
+            const read = scope => {
+                const values = {};
+                for (const key of scope.keys()) values[key] = scope.get(key);
+                return values;
+            };
+            res.json({ node: read(ctx.node), flow: read(ctx.flow), global: read(ctx.global) });
+        } catch (error) {
+            res.status(422).json({ error: error.message });
+        }
     });
 
     router.post('/validate', (req, res) => {

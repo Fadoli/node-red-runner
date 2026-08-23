@@ -3,15 +3,26 @@ const { EventEmitter } = require('node:events');
 const output = {
     events: new EventEmitter(),
     knownTypes: {},
+    typeMetadata: {},
     flow: {},
     registerType(name, constructor, options = {}) {
+        const metadata = output.typeMetadata[name];
+        if (metadata) options = { ...metadata, ...options, editor: { ...(metadata.editor || {}), ...(options.editor || {}) } };
         output.knownTypes[name] = { constructor, options };
+    },
+    setTypeMetadata(name, metadata) {
+        output.typeMetadata[name] = metadata;
+        if (output.knownTypes[name]) {
+            const current = output.knownTypes[name].options || {};
+            output.knownTypes[name].options = { ...metadata, ...current, editor: { ...(metadata.editor || {}), ...(current.editor || {}) } };
+        }
     },
     unregisterType(name) {
         delete output.knownTypes[name];
     },
     cleanTypes() {
         output.knownTypes = {};
+        output.typeMetadata = {};
     },
     cleanFlow() {
         output.flow = {};

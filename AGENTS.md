@@ -98,3 +98,25 @@ behavior is defined by the tests and implemented compatibility surface. A node
 that depends on editor metadata, admin APIs, or unimplemented runtime services
 may not work even if it installs successfully.
 
+## Flow editor UI conventions
+
+- The editor is served by `src/editor-ui.js` from the raw assets
+  `src/editor-ui.html` and `src/editor-ui-client.js`; keep browser code
+  dependency-free and validate it with `node --check`.
+- `src/editor-api.js` is the only editor backend boundary. Keep deployment
+  revision checks, partial mutation semantics, credential redaction, and SSE
+  event behavior intact when extending the UI.
+- Node rendering metadata comes from adjacent Node-RED `.html` files through
+  `src/nodeReader.js` and `registry.typeMetadata`; do not hard-code built-in
+  node colors, port counts, icons, categories, or editor defaults.
+- Disabled tabs/nodes remain visible in the editor but are greyed out. Runtime
+  compilation still excludes them. Keep `d`/`disabled` controls out of the
+  generic property form and expose explicit Enable/Disable actions.
+- Selection supports shift-click and marquee selection. Moving any selected
+  node moves the complete group. Wires are selectable and deletable; wiring is
+  output-port drag to input-port drag, not a legacy click-to-wire mode.
+- Keep Inspector, Debug, and Context as right-sidebar tabs. Debug consumes the
+  `/api/editor/events` SSE stream; Context uses `/api/editor/context/:id`.
+- When changing pointer interactions, verify selection, group movement,
+  marquee selection, wire dragging/deletion, and Delete-key behavior while an
+  inspector field has focus.

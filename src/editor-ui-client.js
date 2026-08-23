@@ -10,6 +10,7 @@ const state = {
     history: [], baseline: new Map(), wireMode: false, wireFrom: null,
     zoom: 1, nodes: new Map(), wires: new Map(), drag: null,
 };
+const NODE_WIDTH = 150;
 const locked = new Set(['id', 'type', 'z', 'wires', 'x', 'y', 'l', 'w', '_credentialId']);
 const clone = value => JSON.parse(JSON.stringify(value));
 const tabs = () => {
@@ -29,7 +30,7 @@ function setStatus(text, good) { statusEl.textContent = text; statusEl.style.col
 function saveHistory() { state.history.push(clone(state.flow)); if (state.history.length > 30) state.history.shift(); }
 function snap(value) { return Math.max(0, Math.round(value / 24) * 24); }
 function point(event) { const box = canvas.getBoundingClientRect(); return { x: (event.clientX - box.left) / state.zoom, y: (event.clientY - box.top) / state.zoom }; }
-function nodePoint(node, side) { return { x: Number(node.x) + (side === 'out' ? 170 : 0), y: Number(node.y) + 29 }; }
+function nodePoint(node, side) { return { x: Number(node.x) + (side === 'out' ? NODE_WIDTH : 0), y: Number(node.y) + 29 }; }
 function wirePath(from, to) { const a = nodePoint(from, 'out'), b = nodePoint(to, 'in'); return 'M '+a.x+' '+a.y+' C '+(a.x + 70)+' '+a.y+', '+(b.x - 70)+' '+b.y+', '+b.x+' '+b.y; }
 function updateMetrics() { metrics.textContent = nodes().length+' nodes · '+nodes().filter(modified).length+' modified'; }
 function drawWires() {
@@ -51,12 +52,12 @@ function renderNodes() {
     layer.replaceChildren(); state.nodes.clear();
     for (const node of nodes()) {
         const group = document.createElementNS(SVG, 'g'); group.dataset.id = node.id; group.setAttribute('class', 'node'+(state.selectedId === node.id ? ' selected' : '')+(modified(node) ? ' modified' : '')); group.setAttribute('transform', 'translate('+node.x+','+node.y+')');
-        const rect = document.createElementNS(SVG, 'rect'); rect.setAttribute('width', 170); rect.setAttribute('height', 58); rect.setAttribute('rx', 8);
+        const rect = document.createElementNS(SVG, 'rect'); rect.setAttribute('width', NODE_WIDTH); rect.setAttribute('height', 58); rect.setAttribute('rx', 8);
         const title = document.createElementNS(SVG, 'text'); title.setAttribute('class', 'title'); title.setAttribute('x', 14); title.setAttribute('y', 24); title.textContent = node.name || node.type || node.id;
         const type = document.createElementNS(SVG, 'text'); type.setAttribute('class', 'type'); type.setAttribute('x', 14); type.setAttribute('y', 43); type.textContent = node.type || '';
-        group.append(rect, title, type, makePort(0), makePort(170));
+        group.append(rect, title, type, makePort(0), makePort(NODE_WIDTH));
         group.addEventListener('pointerdown', event => {
-            event.preventDefault(); event.stopPropagation(); selectNode(node);
+            event.preventDefault(); event.stopPropagation(); state.selectedId = node.id; renderInspector();
             if (state.wireMode) { state.wireFrom = node; setStatus('Select target node'); return; }
             const cursor = point(event); state.drag = { node, group, dx: cursor.x - Number(node.x), dy: cursor.y - Number(node.y), pointerId: event.pointerId }; group.setPointerCapture(event.pointerId); saveHistory();
         });

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flow Studio</title>
+<style>:root{color-scheme:dark;--bg:#0d1117;--panel:#151b24;--line:#2b394b;--text:#e6edf3;--muted:#8b9bad;--accent:#50a8ff}*{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden;background:var(--bg);color:var(--text);font:13px system-ui}.app{height:100%;display:grid;grid-template-rows:52px 1fr}.top{display:flex;align-items:center;gap:9px;padding:0 16px;background:#111821;border-bottom:1px solid var(--line)}.brand{font-weight:700;font-size:16px;margin-right:12px}.brand span{color:var(--accent)}button,input,textarea{font:inherit;color:inherit}button{border:1px solid var(--line);background:#1b2430;border-radius:6px;padding:7px 11px;cursor:pointer}button:hover,.tab.active{border-color:var(--accent)}button.primary{background:#1677c8;border-color:#238de4}.status{color:var(--muted);margin-left:auto}.body{display:grid;grid-template-columns:230px 1fr 290px;min-height:0}.side{background:var(--panel);padding:14px;overflow:auto}.left{border-right:1px solid var(--line)}.right{border-left:1px solid var(--line)}h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:4px 0 11px}.search,input,textarea{width:100%;padding:8px;background:#0e141b;border:1px solid var(--line);border-radius:5px}.search{margin-bottom:12px}.palette{display:grid;gap:7px}.palette button{text-align:left;display:grid;gap:2px}.palette small,.empty,label,.metrics{color:var(--muted)}.workspace{position:relative;min-width:0;min-height:0;background:#10161f}.tabs{position:absolute;z-index:2;top:10px;left:12px;display:flex;gap:6px}.tab{padding:7px 12px;color:var(--muted);background:#18212c}.canvas{width:100%;height:100%;display:block;touch-action:none;background-color:#10161f;background-image:radial-gradient(#263344 1px,transparent 1px);background-size:24px 24px}.wire{stroke:#7391ab;stroke-width:2;fill:none}.node rect{fill:#1c2a39;stroke:#52708b;stroke-width:1.5}.node.selected rect{stroke:var(--accent);stroke-width:2}.node.modified rect{stroke:#f6b73c;stroke-width:2}.node .title{fill:var(--text);font-weight:600}.node .type{fill:var(--muted);font-size:11px}.node .port{fill:#8fb4d4;stroke:#10161f;stroke-width:2}.field{display:grid;gap:5px;margin-bottom:12px}.field label{font-size:11px}.field textarea{height:90px;resize:vertical;font:12px ui-monospace,monospace}.hint{position:absolute;bottom:12px;left:14px;color:var(--muted);background:#111821dd;border:1px solid var(--line);padding:7px 10px;border-radius:5px}</style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">Flow<span>Studio</span></div>
+      <button id="add">＋ Add node</button><button id="wire">↗ Wire</button><button id="undo">↶ Undo</button><button id="deploy" class="primary">Deploy</button><div id="status" class="status">Loading…</div>
+    </header>
+    <main class="body">
+      <aside class="side left"><h3>Palette</h3><input class="search" id="search" placeholder="Filter node types"><div class="palette" id="palette"></div><div class="metrics" id="metrics"></div></aside>
+      <section class="workspace"><div class="tabs" id="tabs"></div><svg class="canvas" id="canvas"></svg><div class="hint">Drag nodes · wheel to zoom · W to wire · Delete to remove</div></section>
+      <aside class="side right"><h3>Inspector</h3><div id="inspector" class="empty">Select a node to edit its properties.</div></aside>
+    </main>
+  </div>
+  <script src="/editor.js"></script>
+</body>
+</html>

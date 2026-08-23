@@ -5,6 +5,7 @@ const registry = require('./registry');
 const context = require('./context');
 const crypto = require('crypto');
 const http = require('http');
+const { EventEmitter } = require('node:events');
 
 const nrUtils = require('./utils/node-red');
 
@@ -83,6 +84,32 @@ Object.defineProperties(api, {
     httpNode: { get: getApp },
 });
 let server;
+let deploymentPromise = Promise.resolve();
+const httpRoutesByNode = new Map();
+
+function routerStack() {
+    const router = getApp().router;
+    return router && Array.isArray(router.stack) ? router.stack : [];
+}
+
+function captureHttpRoutes(nodeId, before) {
+    const after = routerStack();
+    const added = [];
+    for (const layer of after) if (!before.includes(layer)) added.push(layer);
+    if (added.length) httpRoutesByNode.set(nodeId, added);
+}
+
+function removeHttpRoutes(nodeId) {
+    const routes = httpRoutesByNode.get(nodeId);
+    if (!routes) return;
+    const stack = routerStack();
+    for (let index = stack.length - 1; index >= 0; index--) {
+        if (routes.includes(stack[index])) stack.splice(index, 1);
+    }
+    httpRoutesByNode.delete(nodeId);
+}
+
+registry.events.on('status', (value) => output.events.emit('status', value));
 
 function findConfigReferences(value, configIds, references, referenced) {
     if (typeof value === 'string') {
@@ -190,6 +217,9 @@ function resolveEnvironment(config, credentials) {
 }
 
 const output = {
+    events: new EventEmitter(),
+    _configs: new Map(),
+    _credentials: {},
     /**
      * @description Import a module !
      * @param {function} moduleToImport
@@ -245,9 +275,12 @@ const output = {
             for (const phase of phases) {
                 const pending = [];
                 phase.forEach((config) => {
+                    const beforeRoutes = routerStack().slice();
                     const result = registry.getType(config.type).constructor.call(registry.flow[config.id], config);
                     if (result && typeof result.then === 'function') {
-                        pending.push(result);
+                        pending.push(result.then(() => captureHttpRoutes(config.id, beforeRoutes)));
+                    } else {
+                        captureHttpRoutes(config.id, beforeRoutes);
                     }
                 });
                 if (pending.length) {
@@ -255,6 +288,9 @@ const output = {
                 }
             }
             for (const id in registry.flow) registry.getNode(id).start();
+            output._configs = new Map(flows.map((config) => [config.id, clone(config)]));
+            output._credentials = clone(credentials);
+            output.events.emit('loaded', { count: flows.length });
         } catch (error) {
             // Loading is transactional: close everything created so a retry starts clean.
             const pending = [];
@@ -281,16 +317,147 @@ const output = {
         const promises = [];
         for (const nodeId in registry.flow) {
             const node = registry.flow[nodeId];
+            removeHttpRoutes(nodeId);
             const result = node.close(true);
             if (result && typeof result.then === 'function') {
                 promises.push(result);
             }
         }
         registry.cleanFlow();
+        output._configs = new Map();
+        output._credentials = {};
         if (promises.length) {
             await Promise.all(promises);
         }
         await context.saveNow();
+    },
+    /**
+     * Apply a compiler diff while retaining unaffected node instances.
+     * The operation is serialized because the registry and context are process-global.
+     */
+    async apply(flows, credentials, plan) {
+        const run = async () => {
+            const nextConfigs = new Map(flows.map((config) => [config.id, config]));
+            const oldConfigs = output._configs;
+            const oldCredentials = output._credentials;
+            const restart = new Set(plan.restarted || []);
+            const removed = new Set(plan.removed || []);
+            const affected = new Set(restart);
+            for (const id of removed) affected.add(id);
+            const oldPhases = buildLoadPhases([...oldConfigs.values()]);
+            const newPhases = buildLoadPhases(flows);
+            const closed = [];
+            const staged = [];
+            const stagedConfigs = new Map();
+
+            const closeIds = [];
+            for (let phaseIndex = oldPhases.length - 1; phaseIndex >= 0; phaseIndex--) {
+                const phase = oldPhases[phaseIndex];
+                for (let index = phase.length - 1; index >= 0; index--) {
+                    if (affected.has(phase[index].id)) closeIds.push(phase[index].id);
+                }
+            }
+
+            try {
+                for (const id of closeIds) {
+                    const node = registry.flow[id];
+                    if (!node) continue;
+                    closed.push(id);
+                    removeHttpRoutes(id);
+                    await node.close(removed.has(id));
+                    delete registry.flow[id];
+                }
+
+                // Register replacements before constructors so config references resolve.
+                for (const id of restart) {
+                    const config = nextConfigs.get(id);
+                    if (!config) continue;
+                    const prepared = clone(config);
+                    resolveEnvironment(prepared, credentials || {});
+                    const node = registry.flow[id] = new Node(prepared);
+                    const definition = registry.getType(prepared.type).options.credentials || {};
+                    const supplied = (credentials || {})[prepared._credentialId || prepared.id] || {};
+                    node.credentials = {};
+                    for (const name in definition) {
+                        if (supplied[name] !== undefined) node.credentials[name] = supplied[name];
+                    }
+                    staged.push(id);
+                    stagedConfigs.set(id, prepared);
+                }
+
+                for (const phase of newPhases) {
+                    const pending = [];
+                    for (const config of phase) {
+                        if (!restart.has(config.id)) continue;
+                        const beforeRoutes = routerStack().slice();
+                        const result = registry.getType(config.type).constructor.call(registry.flow[config.id], stagedConfigs.get(config.id));
+                        if (result && typeof result.then === 'function') pending.push(result.then(() => captureHttpRoutes(config.id, beforeRoutes)));
+                        else captureHttpRoutes(config.id, beforeRoutes);
+                    }
+                    if (pending.length) await Promise.all(pending);
+                }
+                for (const id of staged) registry.flow[id].start();
+                for (const id of plan.rewired || []) {
+                    if (registry.flow[id]) registry.flow[id].updateWires();
+                }
+
+                output._configs = new Map([...nextConfigs].map(([id, config]) => [id, clone(config)]));
+                output._credentials = clone(credentials || {});
+                const result = { ...plan, restarted: [...restart], removed: [...removed] };
+                output.events.emit('deployed', result);
+                await context.saveNow();
+                return result;
+            } catch (error) {
+                // Close any partially created replacement nodes and restore the previous set.
+                for (let index = staged.length - 1; index >= 0; index--) {
+                    const id = staged[index];
+                    if (registry.flow[id]) {
+                        removeHttpRoutes(id);
+                        try { await registry.flow[id].close(true); } catch (_) { /* preserve original error */ }
+                        delete registry.flow[id];
+                    }
+                }
+                const restoreIds = new Set(closed);
+                const restoreConfigs = [...oldConfigs.values()];
+                const restorePrepared = new Map();
+                for (const config of restoreConfigs) {
+                    if (!restoreIds.has(config.id)) continue;
+                    const prepared = clone(config);
+                    resolveEnvironment(prepared, oldCredentials);
+                    registry.flow[config.id] = new Node(prepared);
+                    restorePrepared.set(config.id, prepared);
+                    const definition = registry.getType(prepared.type).options.credentials || {};
+                    const supplied = oldCredentials[prepared._credentialId || prepared.id] || {};
+                    registry.flow[config.id].credentials = {};
+                    for (const name in definition) {
+                        if (supplied[name] !== undefined) registry.flow[config.id].credentials[name] = supplied[name];
+                    }
+                }
+                try {
+                    for (const phase of oldPhases) {
+                        const pending = [];
+                        for (const config of phase) {
+                            if (!restoreIds.has(config.id)) continue;
+                            const beforeRoutes = routerStack().slice();
+                            const result = registry.getType(config.type).constructor.call(registry.flow[config.id], restorePrepared.get(config.id));
+                            if (result && typeof result.then === 'function') pending.push(result.then(() => captureHttpRoutes(config.id, beforeRoutes)));
+                            else captureHttpRoutes(config.id, beforeRoutes);
+                        }
+                        if (pending.length) await Promise.all(pending);
+                    }
+                    for (const id of restoreIds) registry.flow[id].start();
+                    for (const id in registry.flow) registry.flow[id].updateWires();
+                } catch (_) {
+                    // The original deployment error remains the useful failure signal.
+                }
+                output._configs = oldConfigs;
+                output._credentials = oldCredentials;
+                throw error;
+            }
+        };
+        const pending = deploymentPromise.then(run, run);
+        deploymentPromise = pending.catch(() => {});
+        return pending;
     },
     /**
      * @description Starts the web server
@@ -307,7 +474,7 @@ const output = {
                 server = undefined;
                 reject(err);
             });
-            server.listen(port, resolve);
+            server.listen(port, api.settings.host || '127.0.0.1', resolve);
         });
     },
     /**

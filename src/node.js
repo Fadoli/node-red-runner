@@ -152,6 +152,7 @@ class Node {
     }
     metric() { }
     status(status) {
+        registry.events.emit('status', { status, source: { id: this.id, type: this.type, name: this.name } });
         const nodes = registry.getEventNodes('status', this);
         for (const node of nodes) {
             node.receive({ status: {

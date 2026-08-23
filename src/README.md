@@ -16,6 +16,10 @@ wire targets. Features should reuse that path instead of adding a second event b
 - `builtins.js` contains the small runtime-owned routing nodes: Catch, Complete,
   Status, and Link nodes.
 - `nodeReader.js` discovers node modules for CLI use.
+- `compiler.js` keeps the canonical editor graph separate from the expanded
+  runtime graph and calculates partial-deploy impact.
+- `flow-store.js`, `editor-api.js`, and `editor-ui.js` provide the revisioned
+  editor API, SSE events, and the dependency-free starter UI at `/editor`.
 
 ## Load lifecycle
 
@@ -25,6 +29,11 @@ wire targets. Features should reuse that path instead of adding a second event b
 4. All `Node` objects are registered so constructors can call `getNode`.
 5. Constructors run dependency-first; asynchronous constructors are awaited.
 6. Wires are resolved only after construction succeeds.
+
+The editor API uses `POST /api/editor/deploy` with domain changes and a
+`baseRev`. The candidate graph is recompiled for validation, but only nodes in
+the calculated impact set are replaced; editor-only position changes and
+wire-only changes preserve node instances.
 
 If construction or wire setup fails, every created node is closed, the registry and
 failed context state are discarded, and the original error is rethrown.

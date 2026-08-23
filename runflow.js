@@ -2,13 +2,14 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const helper = require('./index');
 const NodeReader = require('./src/nodeReader');
 
 const usage = `Usage: node runflow.js [options]
 
   --user-dir <dir>       Node-RED user directory (default: ~/.node-red)
-  --flow <file>          Flow JSON file (default: flows.json in user-dir)
+  --flow <file>          Flow JSON file (default: flows_<hostname>.json or flows.json)
   --credentials <file>   Credentials JSON file (default: <flow>_cred.json)
   --settings <file>      Settings JS or JSON file (default: settings.js in user-dir)
   --flow-id <id>         Run only the selected flow tab
@@ -31,6 +32,13 @@ function parseArgs(args) {
 
 function readOptional(file, fallback) {
     return file && fs.existsSync(file) ? require(file) : fallback;
+}
+
+function resolveFlowFile(userDir, requested) {
+    const configured = path.resolve(userDir, requested || 'flows.json');
+    const hostnameFlow = path.join(userDir, `flows_${os.hostname()}.json`);
+    const genericFlow = path.join(userDir, 'flows.json');
+    return [configured, hostnameFlow, genericFlow].find((file) => fs.existsSync(file)) || configured;
 }
 
 function selectFlow(flow, flowId) {
@@ -103,7 +111,7 @@ async function main(argv = process.argv.slice(2), dependencies = {}) {
     }
 
     const userDir = path.resolve(options['user-dir'] || path.join(require('os').homedir(), '.node-red'));
-    const flowFile = path.resolve(options.flow || path.join(userDir, 'flows.json'));
+    const flowFile = resolveFlowFile(userDir, options.flow);
     const credentialFile = path.resolve(options.credentials || flowFile.replace(/\.json$/, '_cred.json'));
     const settingsFile = path.resolve(options.settings || path.join(userDir, 'settings.js'));
     const settings = readOptional(settingsFile, {});
@@ -147,4 +155,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { decryptCredentials, main, parseArgs, selectFlow, startMetrics, usage };
+module.exports = { decryptCredentials, main, parseArgs, resolveFlowFile, selectFlow, startMetrics, usage };

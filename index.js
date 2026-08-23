@@ -3,6 +3,13 @@ const registry = require('./src/registry');
 const clone = require('./src/utils/node-red').cloneMessage;
 const expandSubflows = require('./src/subflow');
 const registerBuiltins = require('./src/builtins');
+const { clearFlow, compileFlow } = require('./src/compiler');
+const { FlowStore } = require('./src/flow-store');
+const createEditorApi = require('./src/editor-api');
+const mountEditorUi = require('./src/editor-ui');
+
+const flowStore = new FlowStore();
+let editorApiMounted = false;
 
 // This will remove all non necessary nodes.
 /**
@@ -10,48 +17,6 @@ const registerBuiltins = require('./src/builtins');
  * @param {Array<nodes>} flow
  * @returns {Array<nodes>} 
  */
-function clearFlow(flow) {
-    const disabledFlows = {};
-    const disabledIds = {};
-    const enabledIds = {};
-
-    // clean disabled flows / node
-    const newFlow = flow.filter((node) => {
-        if (node.type === 'tab') {
-            disabledFlows[node.id] = node.disabled;
-            disabledIds[node.id] = true;
-            return false;
-        }
-        /*
-        if (node.type === 'comment') {
-            return false;
-        }
-        */
-        if (node.z && disabledFlows[node.z]) {
-            disabledIds[node.id] = true;
-            return false;
-        }
-        if (node.d || node.disabled) {
-            disabledIds[node.id] = true;
-            return false;
-        }
-        enabledIds[node.id] = true;
-        return true;
-    })
-
-    // clean disabled wires
-    newFlow.forEach((node) => {
-        if (!node.wires) {
-            return;
-        }
-        node.wires = node.wires.map((subWires => {
-            return subWires.filter((id) => !!enabledIds[id])
-        }))
-    })
-
-    return newFlow;
-}
-
 const helper = {
     startServer: async (port = 0, cb) => {
         if (port instanceof Function) {
@@ -127,8 +92,15 @@ const helper = {
                 promises.push(runtime.register(element));
             });
             await Promise.all(promises);
-            const cleanedFlow = clearFlow(expandSubflows(flow));
-            await runtime.load(cleanedFlow, creds);
+            const compiled = compileFlow(flow, registry.knownTypes);
+            await runtime.load(compiled.nodes, creds);
+            flowStore.initialize(flow, creds);
+            await flowStore.persist();
+            if (!editorApiMounted) {
+                runtime.getApp().use('/api/editor', createEditorApi({ store: flowStore, runtime, registry }));
+                mountEditorUi(runtime.getApp());
+                editorApiMounted = true;
+            }
 
             if (cb) {
                 cb();
@@ -145,6 +117,7 @@ const helper = {
     unload: async (cb) => {
         try {
             await runtime.clear();
+            flowStore.reset();
             if (cb) cb();
         } catch (error) {
             if (cb) cb(error);
@@ -162,7 +135,17 @@ const helper = {
         }
         try {
             await runtime.stop();
-            await runtime.load(clearFlow(expandSubflows(flows.flows || flows)), creds || flows.credentials);
+            const canonical = flows.flows || flows;
+            const credentials = creds || flows.credentials;
+            const compiled = compileFlow(canonical, registry.knownTypes);
+            await runtime.load(compiled.nodes, credentials);
+            flowStore.initialize(canonical, credentials);
+            await flowStore.persist();
+            if (!editorApiMounted) {
+                runtime.getApp().use('/api/editor', createEditorApi({ store: flowStore, runtime, registry }));
+                mountEditorUi(runtime.getApp());
+                editorApiMounted = true;
+            }
             if (cb) cb();
         } catch (error) {
             if (cb) cb(error);
@@ -195,7 +178,10 @@ const helper = {
         return Array.isArray(value) ? value[0] : value;
     },
     init: (runtimePath, userSettings) => {
-        if (userSettings) runtime.settings(userSettings);
+        if (userSettings) {
+            runtime.settings(userSettings);
+            flowStore.setFile(userSettings.editorFlowFile);
+        }
         return helper;
     },
     request: () => require('supertest')(runtime.getApp()),
@@ -204,7 +190,7 @@ const helper = {
         return address && `http://127.0.0.1:${address.port}`;
     },
     log: () => runtime.getLog(),
-    clearFlow: clearFlow,
+    clearFlow,
     expandSubflows
 };
 

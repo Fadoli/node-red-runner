@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { decryptCredentials, main, parseArgs, selectFlow } = require('../runflow');
+const { decryptCredentials, main, parseArgs, resolveFlowFile, selectFlow } = require('../runflow');
 
 test('CLI parses runtime options', () => {
     assert.deepStrictEqual(parseArgs(['--flow', 'flow.json', '--port', '1888']), {
@@ -19,6 +19,14 @@ test('CLI decrypts Node-RED credential files', () => {
     const cipher = crypto.createCipheriv('aes-256-ctr', crypto.createHash('sha256').update(secret).digest(), iv);
     const encrypted = iv.toString('hex') + cipher.update(JSON.stringify({ n1: { token: 'abc' } }), 'utf8', 'base64') + cipher.final('base64');
     assert.deepStrictEqual(decryptCredentials({ $: encrypted }, secret), { n1: { token: 'abc' } });
+});
+
+test('CLI resolves Node-RED hostname flow files', () => {
+    const userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-flow-'));
+    const hostnameFlow = path.join(userDir, `flows_${os.hostname()}.json`);
+    fs.writeFileSync(hostnameFlow, '[]');
+    assert.strictEqual(resolveFlowFile(userDir), hostnameFlow);
+    fs.rmSync(userDir, { recursive: true, force: true });
 });
 
 test('CLI selects a disabled flow tab with its config nodes', () => {

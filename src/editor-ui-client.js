@@ -27,6 +27,7 @@ const nodes = () => state.flow.flows.filter(node => node.type !== 'tab' && node.
 const selected = () => state.flow.flows.find(node => node.id === state.selectedId) || null;
 const modified = node => state.baseline.size > 0 && (!state.baseline.has(node.id) || JSON.stringify(node) !== state.baseline.get(node.id));
 function setStatus(text, good) { statusEl.textContent = text; statusEl.style.color = good ? '#55d187' : '#8b9bad'; }
+function readableText(color) { const match = /^#?([0-9a-f]{6})$/i.exec(color || ''); if (!match) return '#f2f6fb'; const value = parseInt(match[1], 16); const r = value >> 16 & 255, g = value >> 8 & 255, b = value & 255; return (r * 299 + g * 587 + b * 114) / 1000 > 155 ? '#182331' : '#f2f6fb'; }
 function saveHistory() { state.history.push(clone(state.flow)); state.redo.length = 0; if (state.history.length > 30) state.history.shift(); }
 function restore(snapshot) { state.flow = snapshot; state.selectedId = null; renderTabs(); renderInspector(); renderNodes(); updateMetrics(); }
 function undo() { const previous = state.history.pop(); if (!previous) return; state.redo.push(clone(state.flow)); restore(previous); setStatus('Undo'); }
@@ -60,10 +61,10 @@ function renderNodes() {
     layer.replaceChildren(); state.nodes.clear();
     for (const node of nodes()) {
         const group = document.createElementNS(SVG, 'g'); group.dataset.id = node.id; group.setAttribute('class', 'node'+(state.selectedId === node.id ? ' selected' : '')+(modified(node) ? ' modified' : '')); group.setAttribute('transform', 'translate('+node.x+','+node.y+')');
-        const definition = state.types.find(item => item.type === node.type) || {}; const rect = document.createElementNS(SVG, 'rect'); rect.setAttribute('width', NODE_WIDTH); rect.setAttribute('height', 58); rect.setAttribute('rx', 8); if (definition.color) rect.style.fill = definition.color;
-        const title = document.createElementNS(SVG, 'text'); title.setAttribute('class', 'title'); title.setAttribute('x', 14); title.setAttribute('y', 24); title.textContent = node.name || node.type || node.id;
-        const type = document.createElementNS(SVG, 'text'); type.setAttribute('class', 'type'); type.setAttribute('x', 14); type.setAttribute('y', 43); type.textContent = node.type || '';
-        const nodeStatus = document.createElementNS(SVG, 'text'); nodeStatus.setAttribute('class', 'node-status'); nodeStatus.setAttribute('x', 14); nodeStatus.setAttribute('y', 72); nodeStatus.textContent = state.statuses.get(node.id) || '';
+        const definition = state.types.find(item => item.type === node.type) || {}; const rect = document.createElementNS(SVG, 'rect'); rect.setAttribute('width', NODE_WIDTH); rect.setAttribute('height', 58); rect.setAttribute('rx', 8); if (definition.color) rect.style.fill = definition.color; const foreground = readableText(definition.color);
+        const title = document.createElementNS(SVG, 'text'); title.setAttribute('class', 'title'); title.style.fill = foreground; title.setAttribute('x', 14); title.setAttribute('y', 24); title.textContent = node.name || node.type || node.id;
+        const type = document.createElementNS(SVG, 'text'); type.setAttribute('class', 'type'); type.style.fill = foreground; type.style.opacity = '0.72'; type.setAttribute('x', 14); type.setAttribute('y', 43); type.textContent = node.type || '';
+        const nodeStatus = document.createElementNS(SVG, 'text'); nodeStatus.setAttribute('class', 'node-status'); nodeStatus.style.fill = foreground; nodeStatus.setAttribute('x', 14); nodeStatus.setAttribute('y', 72); nodeStatus.textContent = state.statuses.get(node.id) || '';
         const inputs = Math.max(0, Number(definition.inputs == null ? 1 : definition.inputs)); const outputs = Math.max(0, Number(definition.outputs == null ? 1 : definition.outputs)); for (let port = 0; port < Math.max(inputs, outputs); port++) { if (port < inputs) { const inputPort = makePort(0); inputPort.setAttribute('cy', portY(port, inputs)); group.append(inputPort); } if (port < outputs) { const outputPort = makePort(NODE_WIDTH); outputPort.setAttribute('cy', portY(port, outputs)); group.append(outputPort); } } group.prepend(rect, title, type, nodeStatus);
         group.addEventListener('pointerdown', event => {
             event.preventDefault(); event.stopPropagation(); state.selectedId = node.id; renderInspector();
@@ -120,6 +121,8 @@ let contextSelection = null; setInterval(() => { if (contextSelection !== state.
 const legacyWireButton = document.getElementById('wire'); if (legacyWireButton) { legacyWireButton.style.display = 'none'; legacyWireButton.onclick = null; }
 if (debugButton) debugButton.style.display = 'none';
 document.addEventListener('keydown', event => { if (event.key === 'w' || event.key === 'W') { event.preventDefault(); event.stopImmediatePropagation(); } }, true);
+document.addEventListener('keydown', event => { if (event.key !== 'Delete') return; const node = selected(); if (!node) return; event.preventDefault(); event.stopImmediatePropagation(); saveHistory(); state.flow.flows = state.flow.flows.filter(item => item !== node); state.selectedId = null; renderInspector(); renderNodes(); updateMetrics(); setStatus('Node deleted'); }, true);
+const contrastStyle = document.createElement('style'); contrastStyle.textContent = ':root{--text:#f2f6fb;--muted:#b5c3d1}.side{color:var(--text)}.field label,.empty,.metrics{color:#b5c3d1}'; document.head.append(contrastStyle);
 function renderPalette() {
     const query = document.getElementById('search').value.toLowerCase(); palette.replaceChildren();
     const groups = new Map(), hidden = new Set(['tab', 'helper', '__subflow', '__subflow-output']);

@@ -1,23 +1,84 @@
-const svgNS='http://www.w3.org/2000/svg';
-async function deploy(){const before=await(await fetch('/api/editor/snapshot')).json(),old=new Map(before.flows.map(n=>[n.id,n])),next=new Map(model.flows.map(n=>[n.id,n])),changes=[];for(const n of model.flows){const o=old.get(n.id);if(!o){changes.push({op:'add-node',node:n});continue}const set={};for(const k in n)if(k!=='id'&&k!=='wires'&&JSON.stringify(n[k])!==JSON.stringify(o[k]))set[k]=n[k];if(Object.keys(set).length)changes.push({op:'update-node',id:n.id,set});if(JSON.stringify(n.wires||[])!==JSON.stringify(o.wires||[]))changes.push({op:'replace-wires',id:n.id,wires:n.wires||[]})}for(const n of before.flows)if(!next.has(n.id))changes.push({op:'remove-node',id:n.id});if(!changes.length){status('No changes',true);return}const r=await fetch('/api/editor/deploy',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({baseRev:before.rev,changes})});if(!r.ok){status((await r.json()).error||'Deploy failed');return}status('Deployed',true);load()}
-const canvas=document.getElementById('canvas'), palette=document.getElementById('palette'), inspector=document.getElementById('inspector'), statusEl=document.getElementById('status'), metrics=document.getElementById('metrics');
-let model={flows:[],rev:'0'}, types=[], selected=null, tabId=null, history=[], wireMode=false, wireStart=null, zoom=1, baseline=new Map();
-const copy=v=>JSON.parse(JSON.stringify(v));
-const tabs=()=>{const real=model.flows.filter(n=>n.type==='tab');if(real.length)return real;const seen=new Set(),out=[];for(const n of model.flows){if(n.z&&!seen.has(n.z)){seen.add(n.z);out.push({id:n.z,label:n.z})}}return out};
-const tab=()=>tabs().find(n=>n.id===tabId)||tabs()[0];
-const nodes=()=>model.flows.filter(n=>n.type!=='tab'&&n.type!=='subflow'&&n.wires!==undefined&&(!tab()||n.z===tab().id));
-const modified=n=>baseline.size>0&&(!baseline.has(n.id)||JSON.stringify(n)!==baseline.get(n.id));
-function status(s,ok){statusEl.textContent=s;statusEl.style.color=ok?'#55d187':'#8b9bad'}
-function saveHistory(){history.push(copy(model));if(history.length>30)history.shift()}
-function path(a,b){return 'M '+(a.x+170)+' '+(a.y+29)+' C '+(a.x+240)+' '+(a.y+29)+', '+(b.x-70)+' '+(b.y+29)+', '+b.x+' '+(b.y+29)}
-function updateWires(){const map=new Map(nodes().map(n=>[n.id,n]));for(const p of canvas.querySelectorAll('.wire')){const a=map.get(p.dataset.from),b=map.get(p.dataset.to);if(a&&b)p.setAttribute('d',path(a,b))}}
-function redraw(){canvas.replaceChildren();const ns=nodes(),map=new Map(ns.map(n=>[n.id,n]));for(const n of ns){const ids=(n.wires||[]).flat().concat(n.links||[]);for(const id of ids){const t=map.get(id)||model.flows.find(x=>x.id===id);if(!t||t.z!==n.z)continue;const p=document.createElementNS(svgNS,'path');p.setAttribute('class','wire');p.dataset.from=n.id;p.dataset.to=t.id;p.setAttribute('d',path(n,t));canvas.append(p)}}for(const n of ns){const g=document.createElementNS(svgNS,'g');g.setAttribute('class','node'+(selected===n?' selected':'')+(modified(n)?' modified':''));const move=()=>g.setAttribute('transform','translate('+n.x+','+n.y+')');move();const r=document.createElementNS(svgNS,'rect');r.setAttribute('width',170);r.setAttribute('height',58);r.setAttribute('rx',8);const title=document.createElementNS(svgNS,'text');title.setAttribute('class','title');title.setAttribute('x',14);title.setAttribute('y',24);title.textContent=n.name||n.type||n.id;const type=document.createElementNS(svgNS,'text');type.setAttribute('class','type');type.setAttribute('x',14);type.setAttribute('y',43);type.textContent=n.type||'';for(const x of [0,170]){const port=document.createElementNS(svgNS,'circle');port.setAttribute('class','port');port.setAttribute('cx',x);port.setAttribute('cy',29);port.setAttribute('r',6);g.append(port)}g.prepend(r,title,type);g.onclick=e=>{e.stopPropagation();if(wireMode&&wireStart&&wireStart!==n){connect(wireStart,n);wireMode=false;wireStart=null}else{selected=n;renderInspector();redraw()}};let drag=false,dx=0,dy=0;g.onpointerdown=e=>{if(wireMode){wireStart=n;return}const b=canvas.getBoundingClientRect();drag=true;dx=(e.clientX-b.left)/zoom-n.x;dy=(e.clientY-b.top)/zoom-n.y;g.setPointerCapture(e.pointerId);saveHistory()};g.onpointermove=e=>{if(!drag)return;const b=canvas.getBoundingClientRect();n.x=Math.max(0,Math.round(((e.clientX-b.left)/zoom-dx)/24)*24);n.y=Math.max(0,Math.round(((e.clientY-b.top)/zoom-dy)/24)*24);move();updateWires()};g.onpointerup=()=>{if(drag){drag=false;redraw();renderInspector();updateMetrics()}};canvas.append(g)}}
-const locked=new Set(['id','type','z','wires','x','y','l','w','_credentialId']);
-function renderInspector(){if(!selected){inspector.innerHTML='<div class="empty">Select a node to edit its properties.</div>';return}inspector.replaceChildren();for(const key in selected){if(locked.has(key)||key[0]==='_')continue;const f=document.createElement('div');f.className='field';const label=document.createElement('label');label.textContent=key;f.append(label);const old=selected[key];let input;if(typeof old==='boolean'){input=document.createElement('input');input.type='checkbox';input.checked=old}else{input=document.createElement('textarea');input.value=old&&typeof old==='object'?JSON.stringify(old,null,2):String(old??'');if(!(old&&typeof old==='object')){input=document.createElement('input');input.value=String(old??'')}}input.onchange=()=>{try{saveHistory();selected[key]=input.type==='checkbox'?input.checked:old&&typeof old==='object'?JSON.parse(input.value):typeof old==='number'?Number(input.value):input.value;redraw();updateMetrics();status('Local changes')}catch(e){status('Invalid '+key);renderInspector()}};f.append(input);inspector.append(f)}}
-function updateMetrics(){metrics.textContent=nodes().length+' nodes · '+nodes().filter(modified).length+' modified'}
-function renderTabs(){const e=document.getElementById('tabs');e.replaceChildren();for(const t of tabs()){const b=document.createElement('button');b.className='tab'+(tab()===t?' active':'');b.textContent=t.label||t.name||t.id;b.onclick=()=>{tabId=t.id;selected=null;renderTabs();redraw();renderInspector();updateMetrics()};e.append(b)}}
-function renderPalette(){const q=document.getElementById('search').value.toLowerCase();palette.replaceChildren();for(const t of types){if(q&&!t.type.toLowerCase().includes(q))continue;const b=document.createElement('button');b.textContent=t.type;b.onclick=()=>{saveHistory();const n={id:'ui-'+Math.random().toString(36).slice(2,9),type:t.type,x:120,y:120,wires:[[]]};if(tab())n.z=tab().id;model.flows.push(n);selected=n;redraw();renderInspector();updateMetrics()};palette.append(b)}}
-function connect(a,b){saveHistory();if(!a.wires)a.wires=[[]];if(!a.wires[0])a.wires[0]=[];if(!a.wires[0].includes(b.id))a.wires[0].push(b.id);redraw();status('Wire added')}
-async function load(){model=await(await fetch('/api/editor/snapshot')).json();tabId=tabs()[0]&&tabs()[0].id;types=await(await fetch('/api/editor/node-types')).json();baseline=new Map(model.flows.map(n=>[n.id,JSON.stringify(n)]));renderTabs();renderPalette();redraw();renderInspector();updateMetrics();status('Ready · revision '+model.rev,true)}
-document.getElementById('undo').onclick=()=>{const old=history.pop();if(old){model=old;selected=null;renderTabs();redraw();renderInspector();updateMetrics()}};document.getElementById('wire').onclick=()=>{wireMode=!wireMode;wireStart=null;status(wireMode?'Wire mode · select source then target':'Ready')};document.getElementById('add').onclick=()=>types[0]&&document.querySelector('#palette button').click();document.getElementById('search').oninput=renderPalette;canvas.onclick=()=>{selected=null;renderInspector();redraw()};canvas.onwheel=e=>{e.preventDefault();zoom=Math.max(.5,Math.min(2,zoom*(e.deltaY<0?1.1:.9)));canvas.style.transform='scale('+zoom+')'};document.onkeydown=e=>{if(e.key==='w'||e.key==='W')document.getElementById('wire').click();if(e.key==='Delete'&&selected){saveHistory();model.flows=model.flows.filter(n=>n!==selected);selected=null;redraw();renderInspector();updateMetrics()}};load().catch(e=>status('Load failed: '+e.message));
-document.getElementById('deploy').onclick=deploy;
+const SVG = 'http://www.w3.org/2000/svg';
+const canvas = document.getElementById('canvas');
+const palette = document.getElementById('palette');
+const inspector = document.getElementById('inspector');
+const statusEl = document.getElementById('status');
+const metrics = document.getElementById('metrics');
+
+const state = {
+    flow: { flows: [], rev: '0' }, types: [], tabId: null, selectedId: null,
+    history: [], baseline: new Map(), wireMode: false, wireFrom: null,
+    zoom: 1, nodes: new Map(), wires: new Map(), drag: null,
+};
+const locked = new Set(['id', 'type', 'z', 'wires', 'x', 'y', 'l', 'w', '_credentialId']);
+const clone = value => JSON.parse(JSON.stringify(value));
+const tabs = () => {
+    const real = state.flow.flows.filter(node => node.type === 'tab');
+    if (real.length) return real;
+    const result = [], seen = new Set();
+    for (const node of state.flow.flows) if (node.z && !seen.has(node.z)) {
+        seen.add(node.z); result.push({ id: node.z, label: node.z });
+    }
+    return result;
+};
+const activeTab = () => tabs().find(tab => tab.id === state.tabId) || tabs()[0];
+const nodes = () => state.flow.flows.filter(node => node.type !== 'tab' && node.type !== 'subflow' && node.wires !== undefined && (!activeTab() || node.z === activeTab().id));
+const selected = () => state.flow.flows.find(node => node.id === state.selectedId) || null;
+const modified = node => state.baseline.size > 0 && (!state.baseline.has(node.id) || JSON.stringify(node) !== state.baseline.get(node.id));
+function setStatus(text, good) { statusEl.textContent = text; statusEl.style.color = good ? '#55d187' : '#8b9bad'; }
+function saveHistory() { state.history.push(clone(state.flow)); if (state.history.length > 30) state.history.shift(); }
+function snap(value) { return Math.max(0, Math.round(value / 24) * 24); }
+function point(event) { const box = canvas.getBoundingClientRect(); return { x: (event.clientX - box.left) / state.zoom, y: (event.clientY - box.top) / state.zoom }; }
+function nodePoint(node, side) { return { x: Number(node.x) + (side === 'out' ? 170 : 0), y: Number(node.y) + 29 }; }
+function wirePath(from, to) { const a = nodePoint(from, 'out'), b = nodePoint(to, 'in'); return 'M '+a.x+' '+a.y+' C '+(a.x + 70)+' '+a.y+', '+(b.x - 70)+' '+b.y+', '+b.x+' '+b.y; }
+function updateMetrics() { metrics.textContent = nodes().length+' nodes · '+nodes().filter(modified).length+' modified'; }
+function drawWires() {
+    let layer = document.getElementById('wire-layer'); if (!layer) { layer = document.createElementNS(SVG, 'g'); layer.id = 'wire-layer'; canvas.append(layer); }
+    layer.replaceChildren(); state.wires.clear(); const visible = new Map(nodes().map(node => [node.id, node]));
+    for (const from of nodes()) {
+        const targets = (from.wires || []).flat().concat(from.links || []);
+        for (const id of targets) { const to = visible.get(id) || state.flow.flows.find(node => node.id === id); if (!to || to.z !== from.z) continue;
+            const path = document.createElementNS(SVG, 'path'); path.setAttribute('class', 'wire'); path.dataset.from = from.id; path.dataset.to = to.id; path.setAttribute('d', wirePath(from, to)); layer.append(path); state.wires.set(from.id+'>'+to.id, path);
+        }
+    }
+}
+function updateWirePositions() { for (const path of state.wires.values()) { const from = state.flow.flows.find(node => node.id === path.dataset.from), to = state.flow.flows.find(node => node.id === path.dataset.to); if (from && to) path.setAttribute('d', wirePath(from, to)); } }
+function selectNode(node) { state.selectedId = node ? node.id : null; renderInspector(); renderNodes(); }
+function renderTabs() { const holder = document.getElementById('tabs'); holder.replaceChildren(); for (const tab of tabs()) { const button = document.createElement('button'); button.className = 'tab'+(activeTab() === tab ? ' active' : ''); button.textContent = tab.label || tab.name || tab.id; button.onclick = () => { state.tabId = tab.id; state.selectedId = null; renderTabs(); renderInspector(); renderNodes(); updateMetrics(); }; holder.append(button); } }
+function makePort(x) { const port = document.createElementNS(SVG, 'circle'); port.setAttribute('class', 'port'); port.setAttribute('cx', x); port.setAttribute('cy', 29); port.setAttribute('r', 6); return port; }
+function renderNodes() {
+    let layer = document.getElementById('node-layer'); if (!layer) { layer = document.createElementNS(SVG, 'g'); layer.id = 'node-layer'; canvas.append(layer); }
+    layer.replaceChildren(); state.nodes.clear();
+    for (const node of nodes()) {
+        const group = document.createElementNS(SVG, 'g'); group.dataset.id = node.id; group.setAttribute('class', 'node'+(state.selectedId === node.id ? ' selected' : '')+(modified(node) ? ' modified' : '')); group.setAttribute('transform', 'translate('+node.x+','+node.y+')');
+        const rect = document.createElementNS(SVG, 'rect'); rect.setAttribute('width', 170); rect.setAttribute('height', 58); rect.setAttribute('rx', 8);
+        const title = document.createElementNS(SVG, 'text'); title.setAttribute('class', 'title'); title.setAttribute('x', 14); title.setAttribute('y', 24); title.textContent = node.name || node.type || node.id;
+        const type = document.createElementNS(SVG, 'text'); type.setAttribute('class', 'type'); type.setAttribute('x', 14); type.setAttribute('y', 43); type.textContent = node.type || '';
+        group.append(rect, title, type, makePort(0), makePort(170));
+        group.addEventListener('pointerdown', event => {
+            event.preventDefault(); event.stopPropagation(); selectNode(node);
+            if (state.wireMode) { state.wireFrom = node; setStatus('Select target node'); return; }
+            const cursor = point(event); state.drag = { node, group, dx: cursor.x - Number(node.x), dy: cursor.y - Number(node.y), pointerId: event.pointerId }; group.setPointerCapture(event.pointerId); saveHistory();
+        });
+        group.addEventListener('pointermove', event => { if (!state.drag || state.drag.node !== node) return; const cursor = point(event); node.x = snap(cursor.x - state.drag.dx); node.y = snap(cursor.y - state.drag.dy); group.setAttribute('transform', 'translate('+node.x+','+node.y+')'); updateWirePositions(); updateMetrics(); });
+        group.addEventListener('pointerup', event => { if (!state.drag || state.drag.node !== node) return; state.drag = null; if (group.hasPointerCapture(event.pointerId)) group.releasePointerCapture(event.pointerId); renderNodes(); drawWires(); });
+        group.addEventListener('click', event => { event.stopPropagation(); if (state.wireMode && state.wireFrom && state.wireFrom !== node) { connect(state.wireFrom, node); state.wireMode = false; state.wireFrom = null; } });
+        layer.append(group); state.nodes.set(node.id, group);
+    }
+    drawWires();
+}
+function renderInspector() {
+    const node = selected(); if (!node) { inspector.innerHTML = '<div class="empty">Select a node to edit its properties.</div>'; return; }
+    inspector.replaceChildren(); const heading = document.createElement('div'); heading.className = 'field'; heading.innerHTML = '<strong>'+String(node.name || node.type || node.id)+'</strong>'; inspector.append(heading);
+    for (const key in node) { if (locked.has(key) || key[0] === '_') continue; const field = document.createElement('div'); field.className = 'field'; const label = document.createElement('label'); label.textContent = key; field.append(label); const original = node[key]; let input;
+        if (typeof original === 'boolean') { input = document.createElement('input'); input.type = 'checkbox'; input.checked = original; }
+        else if (original && typeof original === 'object') { input = document.createElement('textarea'); input.value = JSON.stringify(original, null, 2); }
+        else { input = document.createElement('input'); input.value = original == null ? '' : String(original); }
+        input.addEventListener('input', () => { try { if (input.type === 'checkbox') node[key] = input.checked; else if (original && typeof original === 'object') node[key] = JSON.parse(input.value); else if (typeof original === 'number') node[key] = Number(input.value); else node[key] = input.value; updateMetrics(); renderNodes(); setStatus('Local changes'); } catch { setStatus('Invalid '+key); } }); field.append(input); inspector.append(field);
+    }
+}
+function connect(from, to) { saveHistory(); if (!from.wires) from.wires = [[]]; if (!from.wires[0]) from.wires[0] = []; if (!from.wires[0].includes(to.id)) from.wires[0].push(to.id); renderNodes(); setStatus('Wire added'); }
+function renderPalette() { const query = document.getElementById('search').value.toLowerCase(); palette.replaceChildren(); for (const definition of state.types) { if (query && !definition.type.toLowerCase().includes(query)) continue; const button = document.createElement('button'); button.textContent = definition.type; button.onclick = () => { saveHistory(); const node = { id: 'ui-'+Math.random().toString(36).slice(2, 9), type: definition.type, x: 120, y: 120, wires: [[]] }; if (activeTab()) node.z = activeTab().id; state.flow.flows.push(node); selectNode(node); renderNodes(); updateMetrics(); }; palette.append(button); } }
+async function deploy() { const before = await (await fetch('/api/editor/snapshot')).json(), old = new Map(before.flows.map(node => [node.id, node])), next = new Map(state.flow.flows.map(node => [node.id, node])), changes = []; for (const node of state.flow.flows) { const previous = old.get(node.id); if (!previous) { changes.push({ op: 'add-node', node }); continue; } const set = {}; for (const key in node) if (key !== 'id' && key !== 'wires' && JSON.stringify(node[key]) !== JSON.stringify(previous[key])) set[key] = node[key]; if (Object.keys(set).length) changes.push({ op: 'update-node', id: node.id, set }); if (JSON.stringify(node.wires || []) !== JSON.stringify(previous.wires || [])) changes.push({ op: 'replace-wires', id: node.id, wires: node.wires || [] }); } for (const node of before.flows) if (!next.has(node.id)) changes.push({ op: 'remove-node', id: node.id }); if (!changes.length) { setStatus('No changes', true); return; } const response = await fetch('/api/editor/deploy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ baseRev: before.rev, changes }) }); if (!response.ok) { setStatus((await response.json()).error || 'Deploy failed'); return; } setStatus('Deployed', true); load(); }
+async function load() { state.flow = await (await fetch('/api/editor/snapshot')).json(); state.types = await (await fetch('/api/editor/node-types')).json(); state.tabId = tabs()[0] && tabs()[0].id; state.baseline = new Map(state.flow.flows.map(node => [node.id, JSON.stringify(node)])); renderTabs(); renderPalette(); renderInspector(); renderNodes(); updateMetrics(); setStatus('Ready · revision '+state.flow.rev, true); }
+document.getElementById('deploy').onclick = deploy; document.getElementById('undo').onclick = () => { const previous = state.history.pop(); if (!previous) return; state.flow = previous; state.selectedId = null; renderTabs(); renderInspector(); renderNodes(); updateMetrics(); }; document.getElementById('wire').onclick = () => { state.wireMode = !state.wireMode; state.wireFrom = null; setStatus(state.wireMode ? 'Wire mode · select source then target' : 'Ready'); }; document.getElementById('add').onclick = () => { const first = palette.querySelector('button'); if (first) first.click(); }; document.getElementById('search').oninput = renderPalette; canvas.addEventListener('pointerdown', event => { if (event.target === canvas) { state.selectedId = null; renderInspector(); renderNodes(); } }); canvas.addEventListener('wheel', event => { event.preventDefault(); state.zoom = Math.max(.5, Math.min(2, state.zoom * (event.deltaY < 0 ? 1.1 : .9))); canvas.style.transform = 'scale('+state.zoom+')'; }, { passive: false }); document.addEventListener('keydown', event => { if (event.key === 'w' || event.key === 'W') document.getElementById('wire').click(); const node = selected(); if (event.key === 'Delete' && node) { saveHistory(); state.flow.flows = state.flow.flows.filter(item => item !== node); state.selectedId = null; renderInspector(); renderNodes(); updateMetrics(); } }); load().catch(error => setStatus('Load failed: '+error.message));

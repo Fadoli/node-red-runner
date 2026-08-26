@@ -6,7 +6,6 @@ const registerBuiltins = require('./src/builtins');
 const { clearFlow, compileFlow } = require('./src/compiler');
 const { FlowStore } = require('./src/flow-store');
 const createEditorApi = require('./src/editor-api');
-const mountEditorUi = require('./src/editor-ui');
 
 const flowStore = new FlowStore();
 let editorApiMounted = false;
@@ -98,7 +97,6 @@ const helper = {
             await flowStore.persist();
             if (!editorApiMounted) {
                 runtime.getApp().use('/api/editor', createEditorApi({ store: flowStore, runtime, registry }));
-                mountEditorUi(runtime.getApp());
                 editorApiMounted = true;
             }
 
@@ -143,7 +141,6 @@ const helper = {
             await flowStore.persist();
             if (!editorApiMounted) {
                 runtime.getApp().use('/api/editor', createEditorApi({ store: flowStore, runtime, registry }));
-                mountEditorUi(runtime.getApp());
                 editorApiMounted = true;
             }
             if (cb) cb();

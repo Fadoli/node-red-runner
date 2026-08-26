@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('node:fs');
 const { compileFlow, diffCompiled } = require('./compiler');
 const context = require('./context');
 
@@ -65,6 +66,16 @@ function createEditorApi({ store, runtime, registry }) {
             });
         }
         res.json(types);
+    });
+
+    router.get('/node-editor/:type', (req, res) => {
+        const definition = registry.knownTypes[req.params.type];
+        const htmlPath = definition && definition.options && definition.options.editor && definition.options.editor.htmlPath;
+        if (!htmlPath || !fs.existsSync(htmlPath)) {
+            res.status(404).json({ error: 'node-editor-not-found' });
+            return;
+        }
+        res.type('html').send(fs.readFileSync(htmlPath, 'utf8'));
     });
 
     router.get('/context/:id', (req, res) => {

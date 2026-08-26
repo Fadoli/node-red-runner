@@ -5,11 +5,14 @@ small, testable, and compatible with the incremental deployment API.
 
 ## P0 — make editing dependable
 
-- [ ] **Render real Node-RED edit forms**
+- [x] **Render real Node-RED edit forms**
   - Use parsed `editor.htmlPath`, `editor.defaults`, credentials metadata, and
     typed inputs instead of exposing only generic property controls.
   - Acceptance: function, inject, debug, change, and delay nodes can be
     configured without editing raw JSON; invalid values are shown inline.
+  - Implemented: the Inspector fetches and parses the registered template,
+    renders typed controls and credential fields, and keeps the generic form as
+    a fallback when a template is unavailable.
 - [ ] **Add browser interaction tests**
   - Cover marquee selection, shift selection, group movement, fast dragging,
     port-to-port wiring, wire deletion, Delete in inspector fields, and undo.

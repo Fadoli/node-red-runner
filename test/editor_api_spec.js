@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const helper = require('../index');
 
 test.afterEach(() => helper.unload());
@@ -73,6 +76,32 @@ test('editor API rejects stale revisions and hides credentials', async () => {
         baseRev: snapshot.body.rev,
         changes: [{ op: 'update-node', id: 'source', set: { x: 200 } }],
     }).expect(409);
+});
+
+test('editor API applies protected credential edits without putting them in flow nodes', async () => {
+    await helper.load((RED) => {
+        RED.nodes.registerType('editor-credential', function () {}, { credentials: { token: { type: 'password' } } });
+    }, [{ id: 'credential', type: 'editor-credential', wires: [] }], { credential: { token: 'old' } });
+    const snapshot = await helper.request().get('/api/editor/snapshot').expect(200);
+    await helper.request().post('/api/editor/deploy').send({
+        baseRev: snapshot.body.rev,
+        changes: [],
+        credentials: { credential: { token: 'new' } },
+    }).expect(200);
+    assert.equal(helper.getNode('credential').credentials.token, 'new');
+    assert.equal((await helper.request().get('/api/editor/snapshot')).body.flows[0].credentials, undefined);
+});
+
+test('editor API serves the registered Node-RED editor template', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'editor-api-'));
+    const htmlPath = path.join(directory, 'form.html');
+    fs.writeFileSync(htmlPath, '<script type="text/html" data-template-name="editor-form"><input id="node-input-name" type="text"></script>');
+    await helper.load((RED) => {
+        RED.nodes.registerType('editor-form', function () {}, { editor: { htmlPath } });
+    }, [{ id: 'form', type: 'editor-form', wires: [] }]);
+    const response = await helper.request().get('/api/editor/node-editor/editor-form').expect(200).expect('Content-Type', /html/);
+    assert.match(response.text, /node-input-name/);
+    await helper.request().get('/api/editor/node-editor/missing').expect(404);
 });
 
 test('runtime property changes restart only the changed node and roll back failures', async () => {

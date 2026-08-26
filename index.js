@@ -4,11 +4,6 @@ const clone = require('./src/utils/node-red').cloneMessage;
 const expandSubflows = require('./src/subflow');
 const registerBuiltins = require('./src/builtins');
 const { clearFlow, compileFlow } = require('./src/compiler');
-const { FlowStore } = require('./src/flow-store');
-const createEditorApi = require('./src/editor-api');
-
-const flowStore = new FlowStore();
-let editorApiMounted = false;
 
 // This will remove all non necessary nodes.
 /**
@@ -93,12 +88,6 @@ const helper = {
             await Promise.all(promises);
             const compiled = compileFlow(flow, registry.knownTypes);
             await runtime.load(compiled.nodes, creds);
-            flowStore.initialize(flow, creds);
-            await flowStore.persist();
-            if (!editorApiMounted) {
-                runtime.getApp().use('/api/editor', createEditorApi({ store: flowStore, runtime, registry }));
-                editorApiMounted = true;
-            }
 
             if (cb) {
                 cb();
@@ -115,7 +104,6 @@ const helper = {
     unload: async (cb) => {
         try {
             await runtime.clear();
-            flowStore.reset();
             if (cb) cb();
         } catch (error) {
             if (cb) cb(error);
@@ -137,12 +125,6 @@ const helper = {
             const credentials = creds || flows.credentials;
             const compiled = compileFlow(canonical, registry.knownTypes);
             await runtime.load(compiled.nodes, credentials);
-            flowStore.initialize(canonical, credentials);
-            await flowStore.persist();
-            if (!editorApiMounted) {
-                runtime.getApp().use('/api/editor', createEditorApi({ store: flowStore, runtime, registry }));
-                editorApiMounted = true;
-            }
             if (cb) cb();
         } catch (error) {
             if (cb) cb(error);
@@ -175,10 +157,7 @@ const helper = {
         return Array.isArray(value) ? value[0] : value;
     },
     init: (runtimePath, userSettings) => {
-        if (userSettings) {
-            runtime.settings(userSettings);
-            flowStore.setFile(userSettings.editorFlowFile);
-        }
+        if (userSettings) runtime.settings(userSettings);
         return helper;
     },
     request: () => require('supertest')(runtime.getApp()),

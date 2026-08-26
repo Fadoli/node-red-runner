@@ -57,8 +57,16 @@ class Node {
         this._env = config._env;
         this._parentEnv = config._parentEnv;
         this._parentFlowId = config._parentFlowId;
+        this._path = config._path || config.z || config.id;
+        this._flow = {
+            path: this._path,
+            getSetting: (name) => this.getSetting(name),
+        };
 
         this.listeners = {};
+        // Core nodes may schedule input during construction. Until start()
+        // resolves wires, sending should be harmless rather than undefined.
+        this.send = NOOP;
         this.displayName = this.alias || this.name || this.id;
 
         this._context = context.getContext(this.id, this.z, this._parentFlowId);
@@ -152,6 +160,7 @@ class Node {
     }
     metric() { }
     status(status) {
+        registry.events.emit('status', { status, source: { id: this.id, type: this.type, name: this.name } });
         const nodes = registry.getEventNodes('status', this);
         for (const node of nodes) {
             node.receive({ status: {
@@ -220,6 +229,7 @@ class Node {
     }
 
     receive(msg = {}, send = this.send, complete) {
+        if (typeof send !== 'function') send = typeof this.send === 'function' ? this.send : NOOP;
         const listeners = this.listeners.input || [];
         let completed = false;
         const done = (err) => {

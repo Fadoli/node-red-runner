@@ -5,6 +5,7 @@ const registry = require('./registry');
 const context = require('./context');
 const crypto = require('crypto');
 const http = require('http');
+const { EventEmitter } = require('node:events');
 
 const nrUtils = require('./utils/node-red');
 
@@ -66,13 +67,46 @@ const api = {
     },
     httpNode: undefined,
     httpAdmin: undefined,
+    comms: {
+        publish: (topic, message) => {
+            output.events.emit('comms', { topic, message });
+        },
+    },
     settings: {}
 }
 
 let app;
+function patchLegacyWildcardRoutes(application) {
+    if (application._legacyWildcardRoutesPatched) return;
+    application._legacyWildcardRoutesPatched = true;
+    const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head', 'all', 'use'];
+    for (const method of methods) {
+        const original = application[method];
+        if (typeof original !== 'function') continue;
+        application[method] = function patchedRoute(path, ...handlers) {
+            if (typeof path !== 'string' || !path.endsWith('/*')) {
+                return original.call(this, path, ...handlers);
+            }
+            const rewrittenPath = `${path.slice(0, -1)}*legacySplat`;
+            const wrappedHandlers = handlers.map((handler) => {
+                if (typeof handler !== 'function') return handler;
+                return function legacyWildcardHandler(req, res, next) {
+                    if (req.params && req.params.legacySplat !== undefined && req.params[0] === undefined) {
+                        const value = req.params.legacySplat;
+                        req.params[0] = Array.isArray(value) ? value.join('/') : value;
+                    }
+                    return handler.call(this, req, res, next);
+                };
+            });
+            return original.call(this, rewrittenPath, ...wrappedHandlers);
+        };
+    }
+}
+
 function getApp() {
     if (!app) {
         app = require('express')();
+        patchLegacyWildcardRoutes(app);
         // Node-RED's HTTP nodes still use Express 4's private router name.
         Object.defineProperty(app, '_router', { get: () => app.router });
     }
@@ -83,6 +117,32 @@ Object.defineProperties(api, {
     httpNode: { get: getApp },
 });
 let server;
+let deploymentPromise = Promise.resolve();
+const httpRoutesByNode = new Map();
+
+function routerStack() {
+    const router = getApp().router;
+    return router && Array.isArray(router.stack) ? router.stack : [];
+}
+
+function captureHttpRoutes(nodeId, before) {
+    const after = routerStack();
+    const added = [];
+    for (const layer of after) if (!before.includes(layer)) added.push(layer);
+    if (added.length) httpRoutesByNode.set(nodeId, added);
+}
+
+function removeHttpRoutes(nodeId) {
+    const routes = httpRoutesByNode.get(nodeId);
+    if (!routes) return;
+    const stack = routerStack();
+    for (let index = stack.length - 1; index >= 0; index--) {
+        if (routes.includes(stack[index])) stack.splice(index, 1);
+    }
+    httpRoutesByNode.delete(nodeId);
+}
+
+registry.events.on('status', (value) => output.events.emit('status', value));
 
 function findConfigReferences(value, configIds, references, referenced) {
     if (typeof value === 'string') {
@@ -190,6 +250,9 @@ function resolveEnvironment(config, credentials) {
 }
 
 const output = {
+    events: new EventEmitter(),
+    _configs: new Map(),
+    _credentials: {},
     /**
      * @description Import a module !
      * @param {function} moduleToImport
@@ -245,9 +308,12 @@ const output = {
             for (const phase of phases) {
                 const pending = [];
                 phase.forEach((config) => {
+                    const beforeRoutes = routerStack().slice();
                     const result = registry.getType(config.type).constructor.call(registry.flow[config.id], config);
                     if (result && typeof result.then === 'function') {
-                        pending.push(result);
+                        pending.push(result.then(() => captureHttpRoutes(config.id, beforeRoutes)));
+                    } else {
+                        captureHttpRoutes(config.id, beforeRoutes);
                     }
                 });
                 if (pending.length) {
@@ -255,6 +321,9 @@ const output = {
                 }
             }
             for (const id in registry.flow) registry.getNode(id).start();
+            output._configs = new Map(flows.map((config) => [config.id, clone(config)]));
+            output._credentials = clone(credentials);
+            output.events.emit('loaded', { count: flows.length });
         } catch (error) {
             // Loading is transactional: close everything created so a retry starts clean.
             const pending = [];
@@ -281,12 +350,15 @@ const output = {
         const promises = [];
         for (const nodeId in registry.flow) {
             const node = registry.flow[nodeId];
+            removeHttpRoutes(nodeId);
             const result = node.close(true);
             if (result && typeof result.then === 'function') {
                 promises.push(result);
             }
         }
         registry.cleanFlow();
+        output._configs = new Map();
+        output._credentials = {};
         if (promises.length) {
             await Promise.all(promises);
         }
@@ -307,7 +379,7 @@ const output = {
                 server = undefined;
                 reject(err);
             });
-            server.listen(port, resolve);
+            server.listen(port, api.settings.host || '127.0.0.1', resolve);
         });
     },
     /**

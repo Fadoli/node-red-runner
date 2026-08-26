@@ -1,4 +1,7 @@
+const { EventEmitter } = require('node:events');
+
 const output = {
+    events: new EventEmitter(),
     knownTypes: {},
     flow: {},
     registerType(name, constructor, options = {}) {

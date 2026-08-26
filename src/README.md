@@ -16,6 +16,8 @@ wire targets. Features should reuse that path instead of adding a second event b
 - `builtins.js` contains the small runtime-owned routing nodes: Catch, Complete,
   Status, and Link nodes.
 - `nodeReader.js` discovers node modules for CLI use.
+- `compiler.js` keeps the canonical editor graph separate from the expanded
+  runtime graph and calculates partial-deploy impact.
 
 ## Load lifecycle
 

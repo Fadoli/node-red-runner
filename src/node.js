@@ -194,10 +194,22 @@ class Node {
             this.listeners[eventName] = [];
         }
         const customListen = (...params) => {
-            cb(...params);
-            this.listeners[eventName] = this.listeners[eventName].filter((e) => e !== customListen)
+            try {
+                cb(...params);
+            } finally {
+                this.removeListener(eventName, customListen);
+            }
         }
+        customListen.listener = cb;
         this.listeners[eventName].push(customListen);
+    }
+
+    removeListener(eventName, cb) {
+        const listeners = this.listeners[eventName];
+        if (!listeners) return this;
+        this.listeners[eventName] = listeners.filter((listener) =>
+            listener !== cb && listener.listener !== cb);
+        return this;
     }
 
     /**

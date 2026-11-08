@@ -307,6 +307,7 @@ const output = {
                     if (supplied[name] !== undefined) node.credentials[name] = supplied[name];
                 }
             });
+            registry.rebuildEventNodeIndex();
             for (const phase of phases) {
                 const pending = pendingConstructors = [];
                 phase.forEach((config) => {

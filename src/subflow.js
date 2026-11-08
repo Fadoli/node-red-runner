@@ -90,21 +90,19 @@ function expandSubflows(flow) {
         wrapper._envCredentialInstance = instance._credentialId || instance.id;
         wrapper._envCredentialTemplate = template.id;
         const result = [wrapper, ...configs];
+        const resultById = new Map();
+        for (const node of result) resultById.set(node.id, node);
 
         // Output proxies turn an internal output into the matching wrapper output.
         const outputs = template.out || [];
         for (let index = 0; index < outputs.length; index++) {
             const proxyId = `${instance.id}:out:${index}`;
-            result.push({ id: proxyId, z: instance.id, type: '__subflow-output', parent: instance.id, output: index, wires: [] });
+            const proxy = { id: proxyId, z: instance.id, type: '__subflow-output', parent: instance.id, output: index, wires: [] };
+            result.push(proxy);
+            resultById.set(proxyId, proxy);
             for (const wire of outputs[index].wires || []) {
-                let source;
                 const sourceId = ids[wire.id];
-                for (const node of result) {
-                    if (node.id === sourceId) {
-                        source = node;
-                        break;
-                    }
-                }
+                const source = resultById.get(sourceId);
                 if (!source) throw new Error(`Unknown subflow output node: ${wire.id}`);
                 source.wires ||= [];
                 source.wires[wire.port] ||= [];

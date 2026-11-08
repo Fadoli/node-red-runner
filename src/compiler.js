@@ -10,10 +10,13 @@ function clearFlow(flow) {
     const enabledIds = {};
     const output = [];
 
+    for (const node of flow || []) {
+        if (node.type === 'tab') disabledFlows[node.id] = !!node.disabled;
+    }
+
     for (const original of flow || []) {
         const node = copy(original);
         if (node.type === 'tab') {
-            disabledFlows[node.id] = !!node.disabled;
             continue;
         }
         if (node.z && disabledFlows[node.z]) continue;

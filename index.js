@@ -143,13 +143,16 @@ const helper = {
             throw new Error('node does not exist');
         }
         return new Promise((res, rej) => {
-            let rejectTimeout = setTimeout(() => {
-                rej(new Error(`node did not emit ${event} within ${delay}ms`));
-            }, delay)
-            node.once(event, (...args) => {
+            const listener = (...args) => {
                 clearTimeout(rejectTimeout);
+                node.removeListener(event, listener);
                 res(args.length > 1 ? args : args[0]);
-            })
+            };
+            const rejectTimeout = setTimeout(() => {
+                node.removeListener(event, listener);
+                rej(new Error(`node did not emit ${event} within ${delay}ms`));
+            }, delay);
+            node.on(event, listener);
         })
     },
     awaitNodeInput: async (node, delay = 500) => {

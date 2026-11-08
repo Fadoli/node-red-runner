@@ -90,3 +90,25 @@ Each run starts a fresh Node.js worker for this runner and Node-RED, then sends 
 - `rssMiB`: resident memory immediately after the flow loads.
 
 Both targets disable HTTP routes and do not listen on a port. Use the same Node.js version, machine, flow, run count, and measurement definitions when recording results; the repository does not treat old measurements as current claims.
+
+## Express route bookkeeping lazy-load check
+
+`runtime.load()` used to initialize Express while taking an empty route-stack
+snapshot, including for flows with no HTTP nodes. `routerStack()` now returns an
+empty stack until the app is first requested. The regular benchmark flow has no
+HTTP nodes, so `bench/measure.js` also measures this startup path.
+
+Windows, Node.js 26.13.0, 20 runs, 10,000 messages per run:
+
+| revision | startupMs | flowMs | cpuMs | rssMiB |
+| --- | ---: | ---: | ---: | ---: |
+| before lazy route stack | 158.64 | 5.78 | 106.80 | 65.03 |
+| after lazy route stack | 25.94 | 5.19 | 29.80 | 57.63 |
+
+The startup mean fell by 83.6%. Message-flow time is too short in this small
+workload for the observed difference to be meaningful. Reproduce with the
+existing runnable benchmark:
+
+```sh
+npm run bench -- --runs 20 --messages 10000
+```

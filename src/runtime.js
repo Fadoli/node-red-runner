@@ -121,7 +121,8 @@ let deploymentPromise = Promise.resolve();
 const httpRoutesByNode = new Map();
 
 function routerStack() {
-    const router = getApp().router;
+    if (!app) return [];
+    const router = app.router;
     return router && Array.isArray(router.stack) ? router.stack : [];
 }
 

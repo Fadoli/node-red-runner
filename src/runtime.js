@@ -292,6 +292,8 @@ const output = {
         });
         const phases = buildLoadPhases(flows);
         await context.start(api.settings.contextStorage);
+        const routesBeforeLoad = routerStack().slice();
+        let pendingConstructors = [];
 
         try {
             // Register every node first so getNode always resolves, then initialise dependencies first.
@@ -306,7 +308,7 @@ const output = {
                 }
             });
             for (const phase of phases) {
-                const pending = [];
+                const pending = pendingConstructors = [];
                 phase.forEach((config) => {
                     const beforeRoutes = routerStack().slice();
                     const result = registry.getType(config.type).constructor.call(registry.flow[config.id], config);
@@ -326,6 +328,7 @@ const output = {
             output.events.emit('loaded', { count: flows.length });
         } catch (error) {
             // Loading is transactional: close everything created so a retry starts clean.
+            await Promise.allSettled(pendingConstructors);
             const pending = [];
             for (const id in registry.flow) {
                 try {
@@ -337,6 +340,11 @@ const output = {
             }
             registry.cleanFlow();
             if (pending.length) await Promise.allSettled(pending);
+            const stack = routerStack();
+            for (let index = stack.length - 1; index >= 0; index--) {
+                if (!routesBeforeLoad.includes(stack[index])) stack.splice(index, 1);
+            }
+            for (const config of flows) httpRoutesByNode.delete(config.id);
             context.clearContext();
             throw error;
         }
@@ -379,7 +387,7 @@ const output = {
                 server = undefined;
                 reject(err);
             });
-            server.listen(port, api.settings.host || '127.0.0.1', resolve);
+            server.listen(port, api.settings.host || undefined, resolve);
         });
     },
     /**

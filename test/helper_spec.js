@@ -16,6 +16,7 @@ if (!expect) {
 const helper = require("../index.js");
 const assert = require("node:assert");
 const Node = require("../src/node");
+const runtime = require("../src/runtime");
 
 describe('helper spec', function () {
     afterEach(() => helper.unload());
@@ -28,6 +29,21 @@ describe('helper spec', function () {
         await helper.startServer(0);
         await helper.startServer(0);
         await helper.stopServer();
+    });
+
+    test('listens on all interfaces by default and honors an explicit host', async function () {
+        try {
+            helper.settings({});
+            await helper.startServer(0);
+            assert.ok(['::', '0.0.0.0'].includes(runtime.getServerAddress().address));
+            await helper.stopServer();
+            helper.settings({ host: '127.0.0.1' });
+            await helper.startServer(0);
+            assert.strictEqual(runtime.getServerAddress().address, '127.0.0.1');
+        } finally {
+            await helper.stopServer();
+            helper.settings({});
+        }
     });
 
     test('provides a safe send function before node startup', () => {
@@ -288,6 +304,32 @@ describe('helper spec', function () {
         ]), /startup failed/);
         assert.deepStrictEqual(closed.sort(), ['bad', 'good']);
         assert.strictEqual(helper.getNode('good'), undefined);
+    });
+
+    test('removes routes from failed constructors and pending async constructors before retry', async function () {
+        const nodes = (RED) => {
+            RED.nodes.registerType('async-route', function () {
+                return new Promise((resolve) => setImmediate(() => {
+                    RED.httpNode.get('/late-rollback', (req, res) => res.send('stale'));
+                    resolve();
+                }));
+            });
+            RED.nodes.registerType('throw-route', function () {
+                RED.httpNode.get('/throw-rollback', (req, res) => res.send('stale'));
+                throw new Error('route startup failed');
+            });
+            RED.nodes.registerType('retry-route', function () {
+                RED.httpNode.get('/throw-rollback', (req, res) => res.send('fresh'));
+            });
+        };
+        await assert.rejects(helper.load(nodes, [
+            { id: 'async', type: 'async-route', wires: [] },
+            { id: 'bad', type: 'throw-route', wires: [] },
+        ]), /route startup failed/);
+        await helper.request().get('/late-rollback').expect(404);
+        await helper.request().get('/throw-rollback').expect(404);
+        await helper.load(nodes, [{ id: 'retry', type: 'retry-route', wires: [] }]);
+        await helper.request().get('/throw-rollback').expect(200, 'fresh');
     });
 
     test('rolls back flows after async constructor rejection and allows retry', async function () {

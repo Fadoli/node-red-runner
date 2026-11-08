@@ -35,7 +35,8 @@ function readOptional(file, fallback) {
 }
 
 function resolveFlowFile(userDir, requested) {
-    const configured = path.resolve(userDir, requested || 'flows.json');
+    if (requested) return path.resolve(requested);
+    const configured = path.resolve(userDir, 'flows.json');
     const hostnameFlow = path.join(userDir, `flows_${os.hostname()}.json`);
     const genericFlow = path.join(userDir, 'flows.json');
     return [configured, hostnameFlow, genericFlow].find((file) => fs.existsSync(file)) || configured;

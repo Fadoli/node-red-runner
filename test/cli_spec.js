@@ -29,6 +29,18 @@ test('CLI resolves Node-RED hostname flow files', () => {
     fs.rmSync(userDir, { recursive: true, force: true });
 });
 
+test('CLI preserves explicit flow paths even when a default exists', () => {
+    const userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-flow-'));
+    try {
+        fs.writeFileSync(path.join(userDir, 'flows.json'), '[]');
+        assert.strictEqual(resolveFlowFile(userDir, 'missing-flow.json'), path.resolve('missing-flow.json'));
+        const absolute = path.join(userDir, 'missing.json');
+        assert.strictEqual(resolveFlowFile(userDir, absolute), absolute);
+    } finally {
+        fs.rmSync(userDir, { recursive: true, force: true });
+    }
+});
+
 test('CLI selects a disabled flow tab with its config nodes', () => {
     const selected = selectFlow([
         { id: 'active', type: 'tab' },
